@@ -23,10 +23,13 @@ export default function LoginPage() {
       return
     }
 
-    const token =
-  localStorage.getItem('token') ||
-  sessionStorage.getItem('token')
+const data = await res.json()
+const token: string | undefined = data.token
 
+if (!token) {
+  alert('Login failed')
+  return
+}
 
 if (rememberMe) {
   localStorage.setItem('token', token)
@@ -35,6 +38,7 @@ if (rememberMe) {
 }
 
 router.push('/dashboard')
+
 
   }
 
