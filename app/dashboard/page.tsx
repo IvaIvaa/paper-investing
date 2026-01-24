@@ -1,36 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-
 
 type Trade = {
   id: number
   symbol: string
   quantity: number
-  price: number
+  price: number // total cost
   type: 'BUY' | 'SELL'
 }
 
 const REFRESH_SECONDS = 30
 
-
-
 export default function DashboardPage() {
   const router = useRouter()
 
-  const [sellError, setSellError] = useState<Record<number, string>>({})
+  // AUTH
+  const [loaded, setLoaded] = useState(false)
 
-  // BUY INPUT
+  // BUY
   const [symbol, setSymbol] = useState('')
   const [buyQty, setBuyQty] = useState<number | ''>('')
   const [inputPrice, setInputPrice] = useState<number | null>(null)
-  const [prevInputPrice, setPrevInputPrice] = useState<number | null>(null)
-  const [symbolInput, setSymbolInput] = useState('')
-const [priceLoading, setPriceLoading] = useState(false)
+  const [priceLoading, setPriceLoading] = useState(false)
 
-
-  // PORTFOLIO
+  // DATA
   const [balance, setBalance] = useState(0)
   const [trades, setTrades] = useState<Trade[]>([])
   const [livePrices, setLivePrices] = useState<Record<string, number>>({})
@@ -38,12 +33,14 @@ const [priceLoading, setPriceLoading] = useState(false)
 
   // SELL
   const [sellQty, setSellQty] = useState<Record<number, number>>({})
+  const [sellError, setSellError] = useState<Record<number, string>>({})
 
   // UI
   const [secondsLeft, setSecondsLeft] = useState(REFRESH_SECONDS)
-  const [loaded, setLoaded] = useState(false)
 
-  // 🔐 AUTH
+  // =====================
+  // AUTH CHECK
+  // =====================
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
@@ -55,40 +52,89 @@ const [priceLoading, setPriceLoading] = useState(false)
     fetchBalance(token)
   }, [router])
 
-  // 🔹 BUY LIVE PRICE
-  async function fetchInputPrice(sym: string) {
-  if (!sym) return
+  // =====================
+  // PORTFOLIO STATS (SINGLE SOURCE OF TRUTH)
+  // =====================
+  const portfolioStats = useMemo(() => {
+    let value = 0
+    let cost = 0
+    let pl = 0
+    const EPSILON = 0.01
 
-  setPriceLoading(true)
+    for (const t of trades) {
+      if (t.type !== 'BUY' || t.quantity <= 0) continue
 
-  try {
-    const res = await fetch(`/api/price?symbol=${sym}`)
-    let data = null
-try {
-  data = await res.json()
-} catch {
-  console.error('Invalid JSON response')
-}
+      const live = livePrices[t.symbol]
+      if (typeof live !== 'number') continue
 
+      value += live * t.quantity
+      cost += t.price
 
-    const price =
-      data?.results?.[0]?.c ??
-      data?.price ??
-      null
+      const avg = t.price / t.quantity
+      const diff = live - avg
 
-    if (typeof price === 'number') {
-      setPrevInputPrice(inputPrice)
-      setInputPrice(price)
+      if (Math.abs(diff) >= EPSILON) {
+        pl += diff * t.quantity
+      }
     }
-  } catch {
-  } finally {
-    setPriceLoading(false)
+
+    return {
+      value,
+      pl,
+      percent: cost > 0 ? (pl / cost) * 100 : 0
+    }
+  }, [trades, livePrices])
+
+  // =====================
+  // PER-ROW P/L
+  // =====================
+  function plData(trade: Trade) {
+    if (trade.quantity <= 0) return null
+
+    const live = livePrices[trade.symbol]
+    if (typeof live !== 'number') return null
+
+    const avg = trade.price / trade.quantity
+    if (!isFinite(avg)) return null
+
+    const diff = live - avg
+    if (Math.abs(diff) < 0.01) {
+      return { dollar: 0, percent: 0 }
+    }
+
+    const dollar = diff * trade.quantity
+    const percent = (diff / avg) * 100
+
+    return { dollar, percent }
   }
-}
 
+  // =====================
+  // FETCH BUY PRICE
+  // =====================
+  async function fetchInputPrice(sym: string) {
+    if (!sym) return
+    setPriceLoading(true)
 
+    try {
+      const res = await fetch(`/api/price?symbol=${sym}`)
+      const data = await res.json()
+      const price =
+        data?.results?.[0]?.c ??
+        data?.price ??
+        null
 
-  // 📊 TRADES
+      if (typeof price === 'number') {
+        setInputPrice(price)
+      }
+    } catch {
+    } finally {
+      setPriceLoading(false)
+    }
+  }
+
+  // =====================
+  // FETCH TRADES
+  // =====================
   async function fetchTrades(token: string) {
     const res = await fetch('/api/trades', {
       method: 'POST',
@@ -100,12 +146,12 @@ try {
     setTrades(data)
 
     const symbols = [...new Set(data.map(t => t.symbol))]
-    if (symbols.length > 0) {
-      await fetchLivePrices(symbols) // 🔥 immediate price fetch
-    }
+    if (symbols.length) fetchLivePrices(symbols)
   }
 
-  // 💰 BALANCE
+  // =====================
+  // FETCH BALANCE
+  // =====================
   async function fetchBalance(token: string) {
     const res = await fetch('/api/me', {
       method: 'POST',
@@ -114,31 +160,28 @@ try {
     })
     const data = await res.json()
     setBalance(data.balance)
-  } 
+  }
 
-
-  // 🔄 LIVE PRICES
+  // =====================
+  // FETCH LIVE PRICES
+  // =====================
   async function fetchLivePrices(symbols: string[]) {
-  if (!symbols.length) return
+    try {
+      const res = await fetch('/api/prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols })
+      })
 
-  try {
-    const res = await fetch('/api/prices', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbols }),
-    })
+      const data: Record<string, number> = await res.json()
+      setPrevPrices(livePrices)
+      setLivePrices(prev => ({ ...prev, ...data }))
+    } catch {}
+  }
 
-    const data: Record<string, number> = await res.json()
-
-    setPrevPrices(livePrices)
-    setLivePrices(prev => ({ ...prev, ...data }))
-  } catch {}
-}
-
-
-
-
-  // ⏱ AUTO REFRESH + COUNTDOWN
+  // =====================
+  // AUTO REFRESH
+  // =====================
   useEffect(() => {
     if (!trades.length) return
     const symbols = [...new Set(trades.map(t => t.symbol))]
@@ -158,111 +201,9 @@ try {
     }
   }, [trades])
 
-  // 🎨 COLORS
-  function inputPriceColor() {
-    if (prevInputPrice == null || inputPrice == null) return ''
-    if (inputPrice > prevInputPrice) return 'text-green-600 font-semibold'
-    if (inputPrice < prevInputPrice) return 'text-red-600 font-semibold'
-    return ''
-  }
-
-  function tablePriceColor(sym: string) {
-    if (prevPrices[sym] == null || livePrices[sym] == null) return ''
-    if (livePrices[sym] > prevPrices[sym]) return 'text-green-600 font-semibold'
-    if (livePrices[sym] < prevPrices[sym]) return 'text-red-600 font-semibold'
-    return ''
-  }
-
-  function plData(trade: Trade) {
-  const current = livePrices[trade.symbol]
-  if (typeof current !== 'number') return null
-
-  const avgBuy = trade.price / trade.quantity
-  const EPSILON = 0.001
-  const priceDiff = current - avgBuy
-
-  if (Math.abs(priceDiff) <= EPSILON) {
-    return {
-      dollarPL: 0,
-      percentPL: 0,
-      isNeutral: true,
-    }
-  }
-
-  const dollarPL = priceDiff * trade.quantity
-  const percentPL = (priceDiff / avgBuy) * 100
-
-  return {
-    dollarPL,
-    percentPL,
-    isNeutral: false,
-  }
-}
-
-function portfolioStockValue() {
-  let value = 0
-
-  for (const trade of trades.filter(t => t.type === 'BUY')) {
-    const current = livePrices[trade.symbol]
-    if (typeof current !== 'number') continue
-
-    value += current * trade.quantity
-  }
-
-  return value
-}
-
-
-
-function portfolioPL() {
-  let totalDollar = 0
-  let totalCost = 0
-  const EPSILON = 0.0001
-
-  const buyTrades = trades.filter(t => t.type === 'BUY')
-
-  // No positions → no P/L
-  if (buyTrades.length === 0) {
-    return { dollar: 0, percent: 0 }
-  }
-
-  for (const trade of buyTrades) {
-    const current = livePrices[trade.symbol]
-
-    // Skip if price not loaded yet
-    if (typeof current !== 'number') continue
-    if (!trade.quantity || !trade.price) continue
-
-    const avgBuy = trade.price / trade.quantity
-    const diff = current - avgBuy
-
-    // Ignore tiny float noise
-    if (Math.abs(diff) < EPSILON) continue
-
-    totalDollar += diff * trade.quantity
-    totalCost += trade.price
-  }
-
-  // Still no valid data → zero P/L
-  if (totalCost === 0) {
-    return { dollar: 0, percent: 0 }
-  }
-
-  return {
-    dollar: totalDollar,
-    percent: (totalDollar / totalCost) * 100
-  }
-}
-
-
-const totalPL = portfolioPL()
-const stockValue = portfolioStockValue()
-
-
-
-
-
-  // 🟢 BUY
+  // =====================
+  // BUY
+  // =====================
   async function buyStock() {
     const token = localStorage.getItem('token')
     if (!token || !symbol || !buyQty || inputPrice == null) return
@@ -272,128 +213,85 @@ const stockValue = portfolioStockValue()
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        token,
         symbol,
         quantity: buyQty,
         price: inputPrice * buyQty,
-        type: 'BUY',
-        token
+        type: 'BUY'
       })
     })
 
     setSymbol('')
     setBuyQty('')
     setInputPrice(null)
-    setPrevInputPrice(null)
     fetchTrades(token)
     fetchBalance(token)
   }
 
-  // 🔴 SELL
+  // =====================
+  // SELL
+  // =====================
   async function sellStock(trade: Trade) {
-  const token = localStorage.getItem('token')
-  const qty = sellQty[trade.id]
+    const token = localStorage.getItem('token')
+    const qty = sellQty[trade.id]
 
-  // basic validation
-  if (!token || !qty || qty <= 0) return
+    if (!token || !qty || qty <= 0) return
+    if (qty > trade.quantity) {
+      setSellError({ [trade.id]: `You own ${trade.quantity}` })
+      return
+    }
 
-  // ❌ trying to sell more than owned
-  if (qty > trade.quantity) {
-    setSellError(prev => ({
-      ...prev,
-      [trade.id]: `You only own ${trade.quantity} shares`
-    }))
-    return
-  }
-
-  // ✅ clear error if valid
-  setSellError(prev => ({
-    ...prev,
-    [trade.id]: ''
-  }))
-
-  await fetch('/api/trade', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tradeId: trade.id,
-      symbol: trade.symbol,
-      quantity: qty,
-      type: 'SELL',
-      token
+    await fetch('/api/trade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        tradeId: trade.id,
+        quantity: qty,
+        type: 'SELL'
+      })
     })
-  })
 
-  setSellQty({})
-  fetchTrades(token)
-  fetchBalance(token)
-}
-
+    setSellQty({})
+    fetchTrades(token)
+    fetchBalance(token)
+  }
 
   if (!loaded) return null
 
   return (
-    <main className="p-8 max-w-6xl mx-auto relative">
-      <h1 className="text-2xl font-bold mb-2">Paper Trading Dashboard</h1>
+    <main className="p-8 max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Paper Trading Dashboard</h1>
 
-  <div className="mb-2 text-lg flex gap-6 flex-wrap">
-  <p>
-    Balance:{' '}
-    <strong className="text-green-700">
-      ${balance.toFixed(2)}
-    </strong>
-  </p>
+      <p className="text-lg mb-1">
+        Balance: <strong className="text-green-600">${balance.toFixed(2)}</strong>
+      </p>
 
-  <p>
-    Portfolio Value:{' '}
-    <strong className="text-blue-600">
-      ${stockValue.toFixed(2)}
-    </strong>
-  </p>
-</div>
+      <p className="text-lg mb-1">
+        Portfolio Value:{' '}
+        <strong className="text-blue-600">${portfolioStats.value.toFixed(2)}</strong>
+      </p>
 
-
-         <p
-  className={`mb-6 text-lg ${
-    totalPL.dollar > 0
-      ? 'text-green-600'
-      : totalPL.dollar < 0
-      ? 'text-red-600'
-      : ''
-  }`}
->
-  Portfolio P/L:{' '}
-  <strong>
-    {totalPL.dollar > 0 ? '+' : ''}
-    ${totalPL.dollar.toFixed(2)}
-    {' '}
-    ({totalPL.percent > 0 ? '+' : ''}
-    {totalPL.percent.toFixed(2)}%)
-  </strong>
-</p>
-
+      <p className={`text-lg mb-6 ${
+        portfolioStats.pl > 0 ? 'text-green-600' :
+        portfolioStats.pl < 0 ? 'text-red-600' : ''
+      }`}>
+        Portfolio P/L:{' '}
+        <strong>
+          {portfolioStats.pl > 0 ? '+' : ''}
+          ${portfolioStats.pl.toFixed(2)} ({portfolioStats.percent.toFixed(2)}%)
+        </strong>
+      </p>
 
       {/* BUY */}
-      <div className="flex gap-3 items-end mb-2">
+      <div className="flex gap-3 mb-4">
         <input
-  className="border p-2 w-32"
-  placeholder="AAPL"
-  value={symbolInput}
-  onChange={e => {
-    const v = e.target.value.toUpperCase()
-    setSymbolInput(v)
-    setSymbol(v)
-  }}
-  onBlur={() => {
-    if (symbol) fetchInputPrice(symbol)
-  }}
-  onKeyDown={e => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      fetchInputPrice(symbol)
-    }
-  }}
-/>
-
+          className="border p-2 w-32"
+          placeholder="AAPL"
+          value={symbol}
+          onChange={e => setSymbol(e.target.value.toUpperCase())}
+          onBlur={() => fetchInputPrice(symbol)}
+        />
         <input
           type="number"
           className="border p-2 w-24"
@@ -403,43 +301,26 @@ const stockValue = portfolioStockValue()
         />
         <button
           onClick={buyStock}
-          disabled={!inputPrice || !buyQty || inputPrice * buyQty > balance}
+          disabled={!inputPrice || !buyQty || inputPrice * Number(buyQty) > balance}
           className="bg-green-600 text-white px-6 py-2 rounded disabled:bg-gray-300"
         >
           Buy
         </button>
       </div>
 
-      {priceLoading && (
-  <p className="mb-1 text-sm text-gray-500">
-    Fetching live price…
-  </p>
-)}
-
-
-      {inputPrice !== null && (
-        <p className={`mb-1 text-sm ${inputPriceColor()}`}>
-          Live price: ${inputPrice.toFixed(2)}
-        </p>
-      )}
-
-      {inputPrice !== null && buyQty !== '' && (
-        <p className={`mb-6 text-sm ${inputPriceColor()}`}>
-          Total cost: ${(inputPrice * buyQty).toFixed(2)}
-        </p>
-      )}
+      {priceLoading && <p className="text-sm text-gray-500">Fetching price…</p>}
+      {inputPrice && <p className="text-sm">Live price: ${inputPrice.toFixed(2)}</p>}
 
       {/* TABLE */}
-      <table className="border-collapse border w-full">
+      <table className="border-collapse border w-full mt-6">
         <thead className="bg-red-600 text-white">
           <tr>
-            <th className="border px-3 py-2">Symbol</th>
-            <th className="border px-3 py-2">Qty</th>
-            <th className="border px-3 py-2">Live Price</th>
-            <th className="border px-3 py-2">Total Cost</th>
-            <th className="border px-3 py-2">P/L</th>
-            <th className="border px-3 py-2">Sell Qty</th>
-            <th className="border px-3 py-2">Action</th>
+            <th className="border px-2">Symbol</th>
+            <th className="border px-2">Qty</th>
+            <th className="border px-2">Live</th>
+            <th className="border px-2">Cost</th>
+            <th className="border px-2">P/L</th>
+            <th className="border px-2">Sell</th>
           </tr>
         </thead>
         <tbody>
@@ -447,87 +328,38 @@ const stockValue = portfolioStockValue()
             const pl = plData(trade)
             return (
               <tr key={trade.id}>
-                <td className="border px-3 py-2">{trade.symbol}</td>
-                <td className="border px-3 py-2">{trade.quantity}</td>
-
-                <td className={`border px-3 py-2 ${tablePriceColor(trade.symbol)}`}>
-                  {typeof livePrices[trade.symbol] === 'number'
-  ? `$${livePrices[trade.symbol].toFixed(2)}`
-  : `$${(trade.price / trade.quantity).toFixed(2)}`}
-
+                <td className="border px-2">{trade.symbol}</td>
+                <td className="border px-2">{trade.quantity}</td>
+                <td className="border px-2">
+                  ${livePrices[trade.symbol]?.toFixed(2) ?? '—'}
                 </td>
-
-                <td className={`border px-3 py-2 ${tablePriceColor(trade.symbol)}`}>
-                  ${trade.price.toFixed(2)}
+                <td className="border px-2">${trade.price.toFixed(2)}</td>
+                <td className="border px-2">
+                  {pl
+                    ? `${pl.dollar >= 0 ? '+' : ''}${pl.dollar.toFixed(2)} (${pl.percent.toFixed(2)}%)`
+                    : '—'}
                 </td>
-
-                <td
-                  className={`border px-3 py-2 ${
-                    pl
-                      ? pl.dollarPL > 0
-                        ? 'text-green-600 font-semibold'
-                        : 'text-red-600 font-semibold'
-                      : ''
-                  }`}
-                >
-                  {pl ? (
-                    <>
-                      <div>
-                        {pl.percentPL > 0 ? '+' : ''}
-                        {pl.percentPL.toFixed(2)}%
-                      </div>
-                      <div className="text-xs">
-                        ({pl.dollarPL > 0 ? '+' : ''}
-                        ${pl.dollarPL.toFixed(2)})
-                      </div>
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-
-                <td className="border px-3 py-2 text-center">
+                <td className="border px-2">
                   <input
                     type="number"
-                    className="border w-20 text-center"
+                    className="border w-16 mr-2"
                     value={sellQty[trade.id] || ''}
-                    onChange={e => {
-                      const value = Number(e.target.value)
-
-                      setSellQty(prev => ({
-                        ...prev,
-                        [trade.id]: value
-                      }))
-
-                      // clear error while typing
-                      setSellError(prev => ({
-                        ...prev,
-                        [trade.id]: ''
-                      }))
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        sellStock(trade)
-                      }
-                    }}
+                    onChange={e =>
+                      setSellQty({ [trade.id]: Number(e.target.value) })
+                    }
+                    onKeyDown={e => e.key === 'Enter' && sellStock(trade)}
                   />
-
-{sellError[trade.id] && (
-  <p className="text-xs text-red-600 mt-1">
-    {sellError[trade.id]}
-  </p>
-)}
-
-                </td>
-
-                <td className="border px-3 py-2 text-center">
                   <button
                     onClick={() => sellStock(trade)}
-                    className="bg-red-600 text-white px-4 py-1 rounded hover:bg-red-800"
+                    className="bg-red-600 text-white px-2 py-1 rounded"
                   >
                     Sell
                   </button>
+                  {sellError[trade.id] && (
+                    <div className="text-xs text-red-600">
+                      {sellError[trade.id]}
+                    </div>
+                  )}
                 </td>
               </tr>
             )
@@ -535,9 +367,8 @@ const stockValue = portfolioStockValue()
         </tbody>
       </table>
 
-      {/* COUNTDOWN */}
-      <div className="fixed bottom-4 right-4 text-sm text-gray-600 bg-white px-3 py-1 rounded shadow">
-        Next price update in <strong>{secondsLeft}s</strong>
+      <div className="fixed bottom-4 right-4 text-sm text-gray-600">
+        Next update in {secondsLeft}s
       </div>
     </main>
   )
