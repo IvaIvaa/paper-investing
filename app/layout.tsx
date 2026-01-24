@@ -1,5 +1,6 @@
 import './globals.css'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 
 const geistSans = Geist({
   subsets: ['latin'],
@@ -22,6 +23,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable}`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   )
