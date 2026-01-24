@@ -217,26 +217,43 @@ function portfolioStockValue() {
 function portfolioPL() {
   let totalDollar = 0
   let totalCost = 0
-  const EPSILON = 0.001
+  const EPSILON = 0.0001
 
-  for (const trade of trades.filter(t => t.type === 'BUY')) {
+  const buyTrades = trades.filter(t => t.type === 'BUY')
+
+  // No positions → no P/L
+  if (buyTrades.length === 0) {
+    return { dollar: 0, percent: 0 }
+  }
+
+  for (const trade of buyTrades) {
     const current = livePrices[trade.symbol]
+
+    // Skip if price not loaded yet
     if (typeof current !== 'number') continue
+    if (!trade.quantity || !trade.price) continue
 
     const avgBuy = trade.price / trade.quantity
     const diff = current - avgBuy
 
-    if (Math.abs(diff) <= EPSILON) continue
+    // Ignore tiny float noise
+    if (Math.abs(diff) < EPSILON) continue
 
     totalDollar += diff * trade.quantity
     totalCost += trade.price
   }
 
+  // Still no valid data → zero P/L
+  if (totalCost === 0) {
+    return { dollar: 0, percent: 0 }
+  }
+
   return {
     dollar: totalDollar,
-    percent: totalCost > 0 ? (totalDollar / totalCost) * 100 : 0,
+    percent: (totalDollar / totalCost) * 100
   }
 }
+
 
 const totalPL = portfolioPL()
 const stockValue = portfolioStockValue()
@@ -335,23 +352,24 @@ const stockValue = portfolioStockValue()
 </div>
 
 
-          <p
-      className={`mb-6 text-lg ${
-        totalPL.dollar > 0
-          ? 'text-green-600'
-          : totalPL.dollar < 0
-          ? 'text-red-600'
-          : ''
-      }`}
-    >
-      Portfolio P/L:{' '}
-      <strong>
-        {totalPL.dollar > 0 ? '+' : ''}
-        ${totalPL.dollar.toFixed(2)} (
-        {totalPL.percent > 0 ? '+' : ''}
-        {totalPL.percent.toFixed(2)}%)
-      </strong>
-    </p>
+         <p
+  className={`mb-6 text-lg ${
+    totalPL.dollar > 0
+      ? 'text-green-600'
+      : totalPL.dollar < 0
+      ? 'text-red-600'
+      : ''
+  }`}
+>
+  Portfolio P/L:{' '}
+  <strong>
+    {totalPL.dollar > 0 ? '+' : ''}
+    ${totalPL.dollar.toFixed(2)}
+    {' '}
+    ({totalPL.percent > 0 ? '+' : ''}
+    {totalPL.percent.toFixed(2)}%)
+  </strong>
+</p>
 
 
       {/* BUY */}
