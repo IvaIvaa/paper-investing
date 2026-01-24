@@ -443,7 +443,7 @@ const stockValue = portfolioStockValue()
           </tr>
         </thead>
         <tbody>
-          {trades.filter(t => t.type === 'BUY').map(trade => {
+          {trades.filter(t => t.type === 'BUY' && t.quantity > 0).map(trade => {
             const pl = plData(trade)
             return (
               <tr key={trade.id}>

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
+
+const prisma = new PrismaClient()
 
 export async function POST(req: Request) {
   try {
@@ -8,7 +10,7 @@ export async function POST(req: Request) {
     const { token, symbol, quantity, price, type, tradeId } = body
 
     if (!token) {
-      return NextResponse.json({ error: 'Missing token' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const decoded = jwt.verify(
@@ -16,17 +18,60 @@ export async function POST(req: Request) {
       process.env.JWT_SECRET!
     ) as { userId: number }
 
+    // ======================
+    // 🟢 BUY
+    // ======================
     if (type === 'BUY') {
-      await prisma.trade.create({
-        data: {
+      if (!symbol || !quantity || !price) {
+        return NextResponse.json(
+          { error: 'Missing buy fields' },
+          { status: 400 }
+        )
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId }
+      })
+
+      if (!user || user.balance < price) {
+        return NextResponse.json(
+          { error: 'Insufficient balance' },
+          { status: 400 }
+        )
+      }
+
+      // 🔹 Check if position already exists
+      const existingTrade = await prisma.trade.findFirst({
+        where: {
+          userId: decoded.userId,
           symbol,
-          quantity,
-          price,
-          type: 'BUY',
-          userId: decoded.userId
+          type: 'BUY'
         }
       })
 
+      if (existingTrade) {
+        // 🔁 Merge position (avg price handled automatically)
+        await prisma.trade.update({
+          where: { id: existingTrade.id },
+          data: {
+            quantity: existingTrade.quantity + quantity,
+            price: existingTrade.price + price
+          }
+        })
+      } else {
+        // ➕ Create new position
+        await prisma.trade.create({
+          data: {
+            userId: decoded.userId,
+            symbol,
+            quantity,
+            price,
+            type: 'BUY'
+          }
+        })
+      }
+
+      // 💰 Deduct balance
       await prisma.user.update({
         where: { id: decoded.userId },
         data: {
@@ -37,10 +82,13 @@ export async function POST(req: Request) {
       })
     }
 
+    // ======================
+    // 🔴 SELL
+    // ======================
     if (type === 'SELL') {
-      if (!tradeId) {
+      if (!tradeId || !quantity) {
         return NextResponse.json(
-          { error: 'Missing tradeId' },
+          { error: 'Missing sell fields' },
           { status: 400 }
         )
       }
@@ -56,20 +104,31 @@ export async function POST(req: Request) {
         )
       }
 
-      await prisma.trade.update({
-        where: { id: tradeId },
-        data: {
-          quantity: trade.quantity - quantity
-        }
-      })
+      const pricePerShare = trade.price / trade.quantity
+      const sellValue = pricePerShare * quantity
 
-      const livePricePerShare = trade.price / trade.quantity
+      // 🔥 SELL ALL → DELETE TRADE
+      if (trade.quantity === quantity) {
+        await prisma.trade.delete({
+          where: { id: tradeId }
+        })
+      } else {
+        // 🔽 Partial sell
+        await prisma.trade.update({
+          where: { id: tradeId },
+          data: {
+            quantity: trade.quantity - quantity,
+            price: trade.price - sellValue
+          }
+        })
+      }
 
+      // 💰 Add cash back
       await prisma.user.update({
         where: { id: decoded.userId },
         data: {
           balance: {
-            increment: livePricePerShare * quantity
+            increment: sellValue
           }
         }
       })
