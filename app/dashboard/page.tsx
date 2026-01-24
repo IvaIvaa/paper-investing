@@ -335,7 +335,8 @@ const stockValue = portfolioStockValue()
     <main className="p-8 max-w-6xl mx-auto relative">
       <h1 className="text-2xl font-bold mb-2">Paper Trading Dashboard</h1>
 
-  <div className="mb-2 text-lg flex gap-6 flex-wrap">
+  <div className="mb-4 text-base sm:text-lg flex flex-col sm:flex-row gap-2 sm:gap-6">
+
   <p>
     Balance:{' '}
     <strong className="text-green-700">
@@ -373,9 +374,9 @@ const stockValue = portfolioStockValue()
 
 
       {/* BUY */}
-      <div className="flex gap-3 items-end mb-2">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mb-4">
         <input
-  className="border p-2 w-32"
+  className="border p-2 w-full sm:w-32"
   placeholder="AAPL"
   value={symbolInput}
   onChange={e => {
@@ -396,7 +397,7 @@ const stockValue = portfolioStockValue()
 
         <input
           type="number"
-          className="border p-2 w-24"
+          className="border p-2 w-full sm:w-24"
           placeholder="Qty"
           value={buyQty}
           onChange={e => setBuyQty(Number(e.target.value))}
@@ -404,7 +405,7 @@ const stockValue = portfolioStockValue()
         <button
           onClick={buyStock}
           disabled={!inputPrice || !buyQty || inputPrice * buyQty > balance}
-          className="bg-green-600 text-white px-6 py-2 rounded disabled:bg-gray-300"
+          className="bg-green-600 text-white px-6 py-2 rounded w-full sm:w-auto disabled:bg-gray-300"
         >
           Buy
         </button>
@@ -430,7 +431,8 @@ const stockValue = portfolioStockValue()
       )}
 
       {/* TABLE */}
-      <table className="border-collapse border w-full">
+      <div className="overflow-x-auto">
+  <table className="border-collapse border w-full min-w-[800px]">
         <thead className="bg-red-600 text-white">
           <tr>
             <th className="border px-3 py-2">Symbol</th>
@@ -447,7 +449,7 @@ const stockValue = portfolioStockValue()
             const pl = plData(trade)
             return (
               <tr key={trade.id}>
-                <td className="border px-3 py-2">{trade.symbol}</td>
+                <td className="border px-2 sm:px-3 py-2 text-sm sm:text-base">{trade.symbol}</td>
                 <td className="border px-3 py-2">{trade.quantity}</td>
 
                 <td className={`border px-3 py-2 ${tablePriceColor(trade.symbol)}`}>
@@ -534,9 +536,10 @@ const stockValue = portfolioStockValue()
           })}
         </tbody>
       </table>
+      </div>
 
       {/* COUNTDOWN */}
-      <div className="fixed bottom-4 right-4 text-sm text-gray-600 bg-white px-3 py-1 rounded shadow">
+      <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 text-xs sm:text-sm text-gray-600 bg-white px-3 py-1 rounded shadow">
         Next price update in <strong>{secondsLeft}s</strong>
       </div>
     </main>
