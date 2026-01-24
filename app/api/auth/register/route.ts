@@ -1,15 +1,62 @@
-export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 
 export async function POST(req: Request) {
-  const { email, password } = await req.json()
-  const hash = await bcrypt.hash(password, 10)
+  try {
+    const body = await req.json().catch(() => null)
+    if (!body) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      )
+    }
 
-  await prisma.user.create({
-    data: { email, password: hash }
-  })
+    const { email, password } = body
 
-  return Response.json({ success: true })
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Missing email or password' },
+        { status: 400 }
+      )
+    }
+
+    // 🔍 Check if user already exists
+    const existing = await prisma.user.findUnique({
+      where: { email }
+    })
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'Email already registered' },
+        { status: 409 }
+      )
+    }
+
+    // 🔐 Hash password
+    const hashed = await bcrypt.hash(password, 10)
+
+    // 🧑 Create user with starting balance
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashed,
+        balance: 10000
+      }
+    })
+
+    return NextResponse.json({
+      id: user.id,
+      email: user.email
+    })
+  } catch (err) {
+    console.error('REGISTER ERROR:', err)
+
+    return NextResponse.json(
+      { error: 'Registration failed' },
+      { status: 500 }
+    )
+  }
 }
