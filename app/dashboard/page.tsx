@@ -63,7 +63,13 @@ const [priceLoading, setPriceLoading] = useState(false)
 
   try {
     const res = await fetch(`/api/price?symbol=${sym}`)
-    const data = await res.json()
+    let data = null
+try {
+  data = await res.json()
+} catch {
+  console.error('Invalid JSON response')
+}
+
 
     const price =
       data?.results?.[0]?.c ??

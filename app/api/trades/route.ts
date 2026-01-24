@@ -1,16 +1,28 @@
-export const runtime = 'nodejs'
-
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
 
 export async function POST(req: Request) {
-  const { token } = await req.json()
-  const payload: any = jwt.verify(token, process.env.JWT_SECRET!)
+  try {
+    const { token } = await req.json()
 
-  const trades = await prisma.trade.findMany({
-    where: { userId: payload.userId },
-    orderBy: { createdAt: 'desc' }
-  })
+    if (!token) {
+      return NextResponse.json([], { status: 200 })
+    }
 
-  return Response.json(trades)
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET!
+    ) as { userId: number }
+
+    const trades = await prisma.trade.findMany({
+      where: { userId: decoded.userId },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    return NextResponse.json(trades)
+  } catch (err) {
+    console.error('TRADES ROUTE ERROR:', err)
+    return NextResponse.json([], { status: 200 })
+  }
 }
