@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+
 import { useRouter } from 'next/navigation'
 
 
@@ -42,6 +43,32 @@ const [priceLoading, setPriceLoading] = useState(false)
   // UI
   const [secondsLeft, setSecondsLeft] = useState(REFRESH_SECONDS)
   const [loaded, setLoaded] = useState(false)
+
+  const [search, setSearch] = useState('')
+const [searchResults, setSearchResults] = useState<
+  { symbol: string; name: string }[]
+>([])
+
+const [suggestions, setSuggestions] = useState<
+  { symbol: string; name: string }[]
+>([])
+
+
+useEffect(() => {
+  if (search.length < 2) {
+    setSearchResults([])
+    return
+  }
+
+  const timer = setTimeout(async () => {
+    const res = await fetch(`/api/search-stocks?q=${search}`)
+    const data = await res.json()
+    setSearchResults(data)
+  }, 400) // ⏳ debounce
+
+  return () => clearTimeout(timer)
+}, [search])
+
 
   // 🔐 AUTH
   useEffect(() => {
@@ -259,7 +286,7 @@ const totalPL = portfolioPL()
 const stockValue = portfolioStockValue()
 
 
-
+  
 
 
   // 🟢 BUY
@@ -373,27 +400,57 @@ const stockValue = portfolioStockValue()
 </p>
 
 
+
       {/* BUY */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mb-4">
-        <input
-  className="border p-2 w-full sm:w-32"
-  placeholder="AAPL"
-  value={symbolInput}
-  onChange={e => {
-    const v = e.target.value.toUpperCase()
-    setSymbolInput(v)
-    setSymbol(v)
-  }}
-  onBlur={() => {
-    if (symbol) fetchInputPrice(symbol)
-  }}
-  onKeyDown={e => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      fetchInputPrice(symbol)
-    }
-  }}
-/>
+        <div className="relative w-full sm:w-64">
+  <input
+    className="border p-2 w-full"
+    placeholder="AAPL or Apple"
+    value={symbol}
+    onChange={async e => {
+      const value = e.target.value
+      setSymbol(value.toUpperCase())
+
+      if (value.length < 1) {
+        setSuggestions([])
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/search?query=${value}`)
+        const data = await res.json()
+        setSuggestions(data.slice(0, 6))
+      } catch {
+        setSuggestions([])
+      }
+    }}
+    onBlur={() => {
+      setTimeout(() => setSuggestions([]), 150)
+    }}
+  />
+
+  {suggestions.length > 0 && (
+    <div className="absolute top-full left-0 right-0 bg-white border rounded shadow z-10 max-h-60 overflow-y-auto">
+      {suggestions.map(s => (
+        <div
+          key={s.symbol}
+          className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+          onClick={() => {
+            setSymbol(s.symbol)
+            setSuggestions([])
+            fetchInputPrice(s.symbol)
+          }}
+        >
+          <div className="font-semibold">{s.symbol}</div>
+          <div className="text-xs text-gray-600 truncate">
+            {s.name}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
         <input
           type="number"
