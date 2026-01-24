@@ -1,11 +1,34 @@
-export default function Home() {
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function HomePage() {
+  const router = useRouter()
+  const [checked, setChecked] = useState(false)
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem('token') ||
+      sessionStorage.getItem('token')
+
+    if (token) {
+      router.replace('/dashboard')
+    } else {
+      setChecked(true)
+    }
+  }, [router])
+
+  // Prevent flicker while checking auth
+  if (!checked) return null
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center">
       <h1 className="text-4xl font-bold mb-4">
         Paper Investing Platform
       </h1>
 
-      <p className="text-gray-600 mb-6">
+      <p className="text-gray-600 mb-6 text-center max-w-md">
         Practice trading stocks with real market data — no real money.
       </p>
 
@@ -25,5 +48,5 @@ export default function Home() {
         </a>
       </div>
     </main>
-  );
+  )
 }
