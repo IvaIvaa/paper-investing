@@ -8,23 +8,23 @@ datasource db {
 }
 
 model User {
-  id        Int     @id @default(autoincrement())
-  email     String  @unique
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
   password  String
-  trades    Trade[]
   createdAt DateTime @default(now())
-  balance   Float    @default(10000) // ✅ STARTING BALANCE
+  balance   Float    @default(10000)
+  trades    Trade[]
 }
 
 model Trade {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   symbol    String
   quantity  Int
   price     Float
   type      TradeType
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
 }
 
 enum TradeType {
