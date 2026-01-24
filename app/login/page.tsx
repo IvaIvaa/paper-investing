@@ -6,6 +6,8 @@ export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
+
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -21,9 +23,19 @@ export default function LoginPage() {
       return
     }
 
-    const { token } = await res.json()
-    localStorage.setItem('token', token)
-    router.push('/dashboard')
+    const token =
+  localStorage.getItem('token') ||
+  sessionStorage.getItem('token')
+
+
+if (rememberMe) {
+  localStorage.setItem('token', token)
+} else {
+  sessionStorage.setItem('token', token)
+}
+
+router.push('/dashboard')
+
   }
 
   return (
@@ -46,6 +58,16 @@ export default function LoginPage() {
           required
           onChange={e => setPassword(e.target.value)}
         />
+        <div className="flex items-center gap-2 text-sm mb-4">
+  <input
+    type="checkbox"
+    id="remember"
+    checked={rememberMe}
+    onChange={e => setRememberMe(e.target.checked)}
+  />
+  <label htmlFor="remember">Remember me</label>
+</div>
+
 
         <button className="w-full bg-black text-white py-2">
           Login

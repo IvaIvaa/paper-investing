@@ -44,7 +44,6 @@ const [priceLoading, setPriceLoading] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(REFRESH_SECONDS)
   const [loaded, setLoaded] = useState(false)
 
-  const [search, setSearch] = useState('')
 const [searchResults, setSearchResults] = useState<
   { symbol: string; name: string }[]
 >([])
@@ -54,25 +53,13 @@ const [suggestions, setSuggestions] = useState<
 >([])
 
 
-useEffect(() => {
-  if (search.length < 2) {
-    setSearchResults([])
-    return
-  }
-
-  const timer = setTimeout(async () => {
-    const res = await fetch(`/api/search-stocks?q=${search}`)
-    const data = await res.json()
-    setSearchResults(data)
-  }, 400) // ⏳ debounce
-
-  return () => clearTimeout(timer)
-}, [search])
-
 
   // 🔐 AUTH
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token =
+  localStorage.getItem('token') ||
+  sessionStorage.getItem('token')
+
     if (!token) {
       router.push('/login')
       return
@@ -113,6 +100,20 @@ try {
   }
 }
 
+  async function searchStocks(query: string) {
+  if (!query || query.length < 2) {
+    setSuggestions([])
+    return
+  }
+
+  try {
+    const res = await fetch(`/api/search?query=${query}`)
+    const data = await res.json()
+    setSuggestions(data.slice(0, 5))
+  } catch {
+    setSuggestions([])
+  }
+}
 
 
   // 📊 TRADES
@@ -403,32 +404,31 @@ const stockValue = portfolioStockValue()
 
       {/* BUY */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mb-4">
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-48">
   <input
-    className="border p-2 w-full"
-    placeholder="AAPL or Apple"
-    value={symbol}
-    onChange={async e => {
-      const value = e.target.value
-      setSymbol(value.toUpperCase())
+  className="border p-2 w-full"
+  placeholder="AAPL"
+  value={symbolInput}
+  onChange={e => {
+  const v = e.target.value
+  setSymbolInput(v)
 
-      if (value.length < 1) {
-        setSuggestions([])
-        return
-      }
+  if (v.length >= 3) {
+    searchStocks(v)
+  } else {
+    setSuggestions([])   // ✅ clear dropdown
+  }
+}}
 
-      try {
-        const res = await fetch(`/api/search?query=${value}`)
-        const data = await res.json()
-        setSuggestions(data.slice(0, 6))
-      } catch {
-        setSuggestions([])
-      }
-    }}
-    onBlur={() => {
-      setTimeout(() => setSuggestions([]), 150)
-    }}
-  />
+/>
+
+  {symbolInput.length > 0 && symbolInput.length < 3 && (
+  <span className="absolute -top-5 left-1 text-xs text-red-400 pointer-events-none">
+    Enter at least 3 letters
+  </span>
+)}
+
+
 
   {suggestions.length > 0 && (
     <div className="absolute top-full left-0 right-0 bg-white border rounded shadow z-10 max-h-60 overflow-y-auto">
@@ -437,6 +437,7 @@ const stockValue = portfolioStockValue()
           key={s.symbol}
           className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
           onClick={() => {
+            setSymbolInput(s.symbol)
             setSymbol(s.symbol)
             setSuggestions([])
             fetchInputPrice(s.symbol)
