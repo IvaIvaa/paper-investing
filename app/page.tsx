@@ -1,56 +1,72 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
   const router = useRouter()
-  const [checked, setChecked] = useState(false)
-
-  useEffect(() => {
-    const token =
-      localStorage.getItem('token') ||
-      sessionStorage.getItem('token')
-
-    if (token) {
-      router.replace('/dashboard')
-    } else {
-      setChecked(true)
-    }
-  }, [router])
-
-  // Prevent flicker while checking auth
-  if (!checked) return null
 
   return (
-    <main className="min-h-screen bg-gray-50">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen flex items-center justify-center 
+                     bg-gradient-to-br from-[#0f0f0f] via-[#141414] to-black px-4">
 
-      <h1 className="text-4xl font-bold mb-4">
-        Paper Investing Platform
-      </h1>
+      <div className="relative max-w-2xl w-full text-center">
 
-      <p className="text-gray-600 mb-6 text-center max-w-md">
-        Practice trading stocks with real market data — no real money.
-      </p>
+        {/* Glow */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-green-500/20 to-blue-500/20 
+                        blur-3xl opacity-30 rounded-3xl" />
 
-      <div className="flex gap-4">
-        <a
-          href="/register"
-          className="px-6 py-2 bg-black text-white rounded"
-        >
-          Create Account
-        </a>
+        {/* Card */}
+        <div className="relative bg-white/95 backdrop-blur rounded-3xl shadow-2xl 
+                        p-12 space-y-8">
 
-        <a
-          href="/login"
-          className="px-6 py-2 border rounded"
-        >
-          Login
-        </a>
+          {/* Badge */}
+          <div className="inline-block px-4 py-1 rounded-full text-sm font-medium
+                          bg-gray-100 text-gray-700">
+            📈 Paper Gain • Real market data
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900">
+            Learn the market.
+            <br />
+            <span className="text-transparent bg-clip-text 
+                             bg-gradient-to-r from-green-500 to-blue-600">
+              Risk nothing.
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-lg text-gray-600 leading-relaxed">
+            Practice stock trading with <strong>real market prices</strong>,  
+            build strategies, and grow confidence — without using real money.
+          </p>
+
+          {/* CTA buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <button
+              onClick={() => router.push('/register')}
+              className="px-8 py-4 rounded-xl bg-black text-white text-lg font-semibold
+                         hover:bg-gray-900 active:scale-95 transition"
+            >
+              Get Started Free
+            </button>
+
+            <button
+              onClick={() => router.push('/login')}
+              className="px-8 py-4 rounded-xl text-lg font-semibold
+                         border border-gray-300 text-gray-700
+                         hover:bg-gray-100 active:scale-95 transition"
+            >
+              Log In
+            </button>
+          </div>
+
+          {/* Footer note */}
+          <p className="text-sm text-gray-400">
+            No credit card • Built with real-time data
+          </p>
+        </div>
       </div>
-  </div>
     </main>
-
   )
 }

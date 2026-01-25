@@ -399,8 +399,14 @@ const stockValue = portfolioStockValue()
 
   return (
     
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <main className="min-h-screen bg-black flex items-center justify-center px-4 py-8">
+    
+    {/* FRAME */}
+    <div className="w-full max-w-[1100px] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden">
+
+      
+      {/* INNER CONTENT */}
+      <div className="px-6 py-6 space-y-8">
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
   <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
     
@@ -703,6 +709,7 @@ const stockValue = portfolioStockValue()
       {/* COUNTDOWN */}
       <div className="fixed bottom-4 right-4 text-xs text-gray-500 bg-white/80 backdrop-blur px-3 py-1 rounded-full shadow">
         Next price update in <strong>{secondsLeft}s</strong>
+      </div>
       </div>
       </div>
       </div>
