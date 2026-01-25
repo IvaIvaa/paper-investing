@@ -43,14 +43,22 @@ router.push('/dashboard')
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleLogin} className="w-80 space-y-4">
-        <h1 className="text-2xl font-bold">Login</h1>
+    <main className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <input
+      <form
+  onSubmit={handleLogin}
+  className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-xl space-y-5">
+
+        <h1 className="text-2xl font-bold text-gray-900 text-center">
+          Login
+        </h1>
+
+
+        <input 
           type="email"
           placeholder="Email"
-          className="w-full border p-2"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
           required
           onChange={e => setEmail(e.target.value)}
         />
@@ -58,25 +66,39 @@ router.push('/dashboard')
         <input
           type="password"
           placeholder="Password"
-          className="w-full border p-2"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
           required
           onChange={e => setPassword(e.target.value)}
         />
-        <div className="flex items-center gap-2 text-sm mb-4">
-  <input
-    type="checkbox"
-    id="remember"
-    checked={rememberMe}
-    onChange={e => setRememberMe(e.target.checked)}
-  />
-  <label htmlFor="remember">Remember me</label>
+        <div className="flex items-center justify-between">
+  <span className="text-sm text-gray-700">
+    Remember me
+  </span>
+
+  <button
+    type="button"
+    onClick={() => setRememberMe(!rememberMe)}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition
+      ${rememberMe ? 'bg-black' : 'bg-gray-300'}`}
+  >
+    <span
+      className={`inline-block h-4 w-4 transform rounded-full bg-white transition
+        ${rememberMe ? 'translate-x-6' : 'translate-x-1'}`}
+    />
+  </button>
 </div>
 
+      <button
+  type="submit"
+  className="w-full mt-2 rounded-lg bg-black py-2 text-white font-semibold
+             hover:bg-gray-900 transition focus:outline-none focus:ring-2 focus:ring-black"
+>
+  Login
+</button>
 
-        <button className="w-full bg-black text-white py-2">
-          Login
-        </button>
+
       </form>
+      </div>
     </main>
   )
 }

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 
 export default function RegisterPage() {
   const router = useRouter()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -21,18 +22,36 @@ export default function RegisterPage() {
       return
     }
 
-    router.push('/login')
+    const data = await res.json()
+    const token: string | undefined = data.token
+
+    if (!token) {
+      alert('Registration failed')
+      return
+    }
+
+    // Default: remember user after register
+    localStorage.setItem('token', token)
+
+    router.push('/dashboard')
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleRegister} className="w-80 space-y-4">
-        <h1 className="text-2xl font-bold">Create Account</h1>
+    <main className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <form
+        onSubmit={handleRegister}
+        className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-xl space-y-5"
+      >
+        <h1 className="text-2xl font-bold text-gray-900 text-center">
+          Create Account
+        </h1>
 
         <input
           type="email"
           placeholder="Email"
-          className="w-full border p-2"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2
+                     text-gray-900 placeholder-gray-400
+                     focus:outline-none focus:ring-2 focus:ring-black"
           required
           onChange={e => setEmail(e.target.value)}
         />
@@ -40,14 +59,28 @@ export default function RegisterPage() {
         <input
           type="password"
           placeholder="Password"
-          className="w-full border p-2"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2
+                     text-gray-900 placeholder-gray-400
+                     focus:outline-none focus:ring-2 focus:ring-black"
           required
           onChange={e => setPassword(e.target.value)}
         />
 
-        <button className="w-full bg-black text-white py-2">
-          Register
+        <button
+          type="submit"
+          className="w-full rounded-lg bg-black py-2 text-white font-semibold
+                     hover:bg-gray-900 transition
+                     focus:outline-none focus:ring-2 focus:ring-black"
+        >
+          Create Account
         </button>
+
+        <p className="text-center text-sm text-gray-600">
+          Already have an account?{' '}
+          <a href="/login" className="text-black font-semibold hover:underline">
+            Login
+          </a>
+        </p>
       </form>
     </main>
   )

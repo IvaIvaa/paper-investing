@@ -15,6 +15,44 @@ type Trade = {
 
 const REFRESH_SECONDS = 30
 
+function StatCard({
+  title,
+  value,
+  sub,
+  color,
+}: {
+  title: string
+  value: string
+  sub?: string
+  color?: 'green' | 'red'
+}) {
+  return (
+  <div className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+    <p className="text-sm font-medium text-gray-600">
+      {title}
+    </p>
+
+    <p
+      className={`mt-1 text-3xl font-semibold ${
+        color === 'green'
+          ? 'text-green-600'
+          : color === 'red'
+          ? 'text-red-600'
+          : 'text-gray-900'
+      }`}
+    >
+      {value}
+    </p>
+
+    {sub && (
+      <p className="mt-1 text-sm text-gray-500">
+        {sub}
+      </p>
+    )}
+  </div>
+)
+
+}
 
 
 export default function DashboardPage() {
@@ -360,67 +398,95 @@ const stockValue = portfolioStockValue()
   if (!loaded) return null
 
   return (
-    <main className="p-8 max-w-6xl mx-auto relative">
-      <h1 className="text-2xl font-bold mb-2">Paper Trading Dashboard</h1>
+    
+    <main className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
+  <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    
+    {/* Brand */}
+    <div className="flex items-center gap-2">
+      <div className="h-9 w-9 rounded-lg bg-black text-white flex items-center justify-center font-bold">
+        PG
+      </div>
+      <span className="text-lg font-semibold text-gray-900">
+        Paper Gain
+      </span>
+    </div>
 
-  <div className="mb-4 text-base sm:text-lg flex flex-col sm:flex-row gap-2 sm:gap-6">
+    {/* Actions */}
+    <button
+  onClick={() => {
+    localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
+    router.push('/login')
+  }}
+  className="px-4 py-2 rounded-lg text-sm font-medium
+             text-gray-700 hover:text-red-600
+             hover:bg-red-50 transition"
+>
+  Logout
+</button>
 
-  <p>
-    Balance:{' '}
-    <strong className="text-green-700">
-      ${balance.toFixed(2)}
-    </strong>
-  </p>
 
-  <p>
-    Portfolio Value:{' '}
-    <strong className="text-blue-600">
-      ${stockValue.toFixed(2)}
-    </strong>
-  </p>
+  </div>
+</header>
+
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <h1 className="text-2xl font-bold mb-4 text-gray-900">
+  Paper Trading Dashboard
+</h1>
+
+      
+
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <StatCard
+    title="Balance"
+    value={`$${balance.toFixed(2)}`}
+  />
+
+  <StatCard
+    title="Portfolio Value"
+    value={`$${stockValue.toFixed(2)}`}
+  />
+
+  <StatCard
+    title="Total P/L"
+    value={`${totalPL.dollar >= 0 ? '+' : ''}$${totalPL.dollar.toFixed(2)}`}
+    sub={`${totalPL.percent.toFixed(2)}%`}
+    color={totalPL.dollar >= 0 ? 'green' : 'red'}
+  />
 </div>
 
-
-         <p
-  className={`mb-6 text-lg ${
-    totalPL.dollar > 0
-      ? 'text-green-600'
-      : totalPL.dollar < 0
-      ? 'text-red-600'
-      : ''
-  }`}
->
-  Portfolio P/L:{' '}
-  <strong>
-    {totalPL.dollar > 0 ? '+' : ''}
-    ${totalPL.dollar.toFixed(2)}
-    {' '}
-    ({totalPL.percent > 0 ? '+' : ''}
-    {totalPL.percent.toFixed(2)}%)
-  </strong>
-</p>
 
 
 
       {/* BUY */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mb-4">
-        <div className="relative w-48">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-[160px_100px_auto] gap-3 items-end">
+
+  <div className="relative w-full sm:w-40">
   <input
-  className="border p-2 w-full"
-  placeholder="AAPL"
-  value={symbolInput}
-  onChange={e => {
-  const v = e.target.value
-  setSymbolInput(v)
+    className="w-full h-[44px] rounded-lg border border-gray-300
+           px-3 text-gray-900 placeholder-gray-400
+           focus:outline-none focus:ring-2 focus:ring-black"
 
-  if (v.length >= 3) {
-    searchStocks(v)
-  } else {
-    setSuggestions([])   // ✅ clear dropdown
-  }
-}}
 
-/>
+    placeholder="AAPL"
+    value={symbolInput}
+    onChange={e => {
+      const v = e.target.value
+      setSymbolInput(v)
+
+      if (v.length >= 3) {
+        searchStocks(v)
+      } else {
+        setSuggestions([])
+      }
+    }}
+  />
 
   {symbolInput.length > 0 && symbolInput.length < 3 && (
   <span className="absolute -top-5 left-1 text-xs text-red-400 pointer-events-none">
@@ -452,22 +518,37 @@ const stockValue = portfolioStockValue()
     </div>
   )}
 </div>
+    <input
+      type="number"
+      className="w-full h-[44px] rounded-lg border border-gray-300
+           px-3 text-gray-900 placeholder-gray-400
+           focus:outline-none focus:ring-2 focus:ring-black"
 
-        <input
-          type="number"
-          className="border p-2 w-full sm:w-24"
-          placeholder="Qty"
-          value={buyQty}
-          onChange={e => setBuyQty(Number(e.target.value))}
-        />
-        <button
-          onClick={buyStock}
-          disabled={!inputPrice || !buyQty || inputPrice * buyQty > balance}
-          className="bg-green-600 text-white px-6 py-2 rounded w-full sm:w-auto disabled:bg-gray-300"
-        >
-          Buy
-        </button>
-      </div>
+      placeholder="Qty"
+      value={buyQty}
+      onChange={e => setBuyQty(Number(e.target.value))}
+    />
+    <button
+      onClick={buyStock}
+      disabled={!inputPrice || !buyQty || inputPrice * buyQty > balance}
+      className="
+  w-full sm:w-auto
+  bg-gray-800 text-white
+  px-6 py-2 rounded-lg
+  hover:bg-gray-900
+  active:bg-black
+  active:scale-95
+  transition-all
+  disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed
+"
+
+
+
+    >
+      Buy
+    </button>
+    </div>
+</div>
 
       {priceLoading && (
   <p className="mb-1 text-sm text-gray-500">
@@ -477,59 +558,74 @@ const stockValue = portfolioStockValue()
 
 
       {inputPrice !== null && (
-        <p className={`mb-1 text-sm ${inputPriceColor()}`}>
-          Live price: ${inputPrice.toFixed(2)}
-        </p>
+        <p
+  className={`mb-1 text-sm font-medium ${
+    inputPriceColor() || 'text-gray-700'
+  }`}
+>
+  Live price: ${inputPrice.toFixed(2)}
+</p>
+
       )}
 
       {inputPrice !== null && buyQty !== '' && (
-        <p className={`mb-6 text-sm ${inputPriceColor()}`}>
-          Total cost: ${(inputPrice * buyQty).toFixed(2)}
-        </p>
+        <p
+  className={`mb-6 text-sm font-semibold ${
+    inputPriceColor() || 'text-gray-800'
+  }`}
+>
+  Total cost: ${(inputPrice * buyQty).toFixed(2)}
+</p>
+
       )}
 
       {/* TABLE */}
-      <div className="overflow-x-auto">
-  <table className="border-collapse border w-full min-w-[800px]">
-        <thead className="bg-red-600 text-white">
-          <tr>
-            <th className="border px-3 py-2">Symbol</th>
-            <th className="border px-3 py-2">Qty</th>
-            <th className="border px-3 py-2">Live Price</th>
-            <th className="border px-3 py-2">Total Cost</th>
-            <th className="border px-3 py-2">P/L</th>
-            <th className="border px-3 py-2">Sell Qty</th>
-            <th className="border px-3 py-2">Action</th>
+  <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+  <div className="overflow-x-auto">
+
+  <table className="w-full text-sm text-gray-700">
+        <thead className="bg-gray-100 text-gray-600 text-xs uppercase tracking-wide">
+          <tr className="hover:bg-gray-50 transition">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Symbol</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Qty</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Live Price</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Total Cost</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">P/L</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sell Qty</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Action</th>
           </tr>
         </thead>
         <tbody>
           {trades.filter(t => t.type === 'BUY' ).map(trade => {
             const pl = plData(trade)
             return (
-              <tr key={trade.id}>
-                <td className="border px-2 sm:px-3 py-2 text-sm sm:text-base">{trade.symbol}</td>
-                <td className="border px-3 py-2">{trade.quantity}</td>
+              <tr className="hover:bg-gray-50 transition">
+                <td className="px-4 py-4 whitespace-nowrap">{trade.symbol}</td>
+                <td className="px-4 py-4 whitespace-nowrap">{trade.quantity}</td>
 
-                <td className={`border px-3 py-2 ${tablePriceColor(trade.symbol)}`}>
+                <td className={`px-4 py-4 whitespace-nowrap ${tablePriceColor(trade.symbol)}`}>
                   {typeof livePrices[trade.symbol] === 'number'
   ? `$${livePrices[trade.symbol].toFixed(2)}`
   : `$${(trade.price / trade.quantity).toFixed(2)}`}
 
                 </td>
 
-                <td className={`border px-3 py-2 ${tablePriceColor(trade.symbol)}`}>
+                <td className={`px-4 py-4 whitespace-nowrap ${tablePriceColor(trade.symbol)}`}>
                   ${trade.price.toFixed(2)}
                 </td>
 
                 <td
-                  className={`border px-3 py-2 ${
-                    pl
-                      ? pl.dollarPL > 0
-                        ? 'text-green-600 font-semibold'
-                        : 'text-red-600 font-semibold'
-                      : ''
-                  }`}
-                >
+  className={`px-4 py-4 whitespace-nowrap ${
+    !pl
+      ? 'text-gray-400'
+      : pl.dollarPL === 0
+      ? 'text-gray-400'
+      : pl.dollarPL > 0
+      ? 'text-green-600'
+      : 'text-red-600'
+  }`}
+>
+
                   {pl ? (
                     <>
                       <div>
@@ -546,32 +642,39 @@ const stockValue = portfolioStockValue()
                   )}
                 </td>
 
-                <td className="border px-3 py-2 text-center">
+                <td className="px-4 py-4 whitespace-nowrap">
                   <input
-                    type="number"
-                    className="border w-20 text-center"
-                    value={sellQty[trade.id] || ''}
-                    onChange={e => {
-                      const value = Number(e.target.value)
+  type="number"
+  min={1}
+  className="
+    w-20 px-2 py-1.5
+    rounded-lg
+    bg-gray-50
+    border border-gray-300
+    text-center text-sm text-gray-900
+    placeholder-gray-400
+    focus:outline-none
+    focus:ring-2 focus:ring-black
+    focus:border-black
+    transition
+  "
+  placeholder="Qty"
+  value={sellQty[trade.id] || ''}
+  onChange={e => {
+    const value = Number(e.target.value)
 
-                      setSellQty(prev => ({
-                        ...prev,
-                        [trade.id]: value
-                      }))
+    setSellQty(prev => ({
+      ...prev,
+      [trade.id]: value
+    }))
 
-                      // clear error while typing
-                      setSellError(prev => ({
-                        ...prev,
-                        [trade.id]: ''
-                      }))
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        sellStock(trade)
-                      }
-                    }}
-                  />
+    setSellError(prev => ({
+      ...prev,
+      [trade.id]: ''
+    }))
+  }}
+/>
+
 
 {sellError[trade.id] && (
   <p className="text-xs text-red-600 mt-1">
@@ -581,7 +684,7 @@ const stockValue = portfolioStockValue()
 
                 </td>
 
-                <td className="border px-3 py-2 text-center">
+                <td className="px-4 py-4 whitespace-nowrap">
                   <button
                     onClick={() => sellStock(trade)}
                     className="bg-red-600 text-white px-4 py-1 rounded hover:bg-red-800"
@@ -595,10 +698,13 @@ const stockValue = portfolioStockValue()
         </tbody>
       </table>
       </div>
+      </div>
 
       {/* COUNTDOWN */}
-      <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 text-xs sm:text-sm text-gray-600 bg-white px-3 py-1 rounded shadow">
+      <div className="fixed bottom-4 right-4 text-xs text-gray-500 bg-white/80 backdrop-blur px-3 py-1 rounded-full shadow">
         Next price update in <strong>{secondsLeft}s</strong>
+      </div>
+      </div>
       </div>
     </main>
   )

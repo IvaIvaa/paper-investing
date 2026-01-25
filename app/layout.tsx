@@ -1,14 +1,10 @@
 import './globals.css'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter } from 'next/font/google'
 
-const geistSans = Geist({
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-geist-sans',
-})
-
-const geistMono = Geist_Mono({
-  subsets: ['latin'],
-  variable: '--font-geist-mono',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-inter',
 })
 
 export default function RootLayout({
@@ -17,10 +13,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable}`}
-      >
+    <html lang="en">
+      <body className={`${inter.variable} font-sans bg-gray-50 text-gray-900`}>
         {children}
       </body>
     </html>

@@ -23,7 +23,9 @@ export default function HomePage() {
   if (!checked) return null
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center">
+    <main className="min-h-screen bg-gray-50">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
       <h1 className="text-4xl font-bold mb-4">
         Paper Investing Platform
       </h1>
@@ -47,6 +49,8 @@ export default function HomePage() {
           Login
         </a>
       </div>
+  </div>
     </main>
+
   )
 }
