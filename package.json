@@ -9,6 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.1",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/cli": "^8.0.1",
+    "@capacitor/core": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.0",
     "@prisma/client": "^5.10.2",
     "@vercel/analytics": "^1.6.1",
     "bcrypt": "^6.0.0",

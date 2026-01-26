@@ -1,0 +1,21 @@
+{
+  "appId": "com.papergain.app",
+  "appName": "Paper Gain",
+  "bundledWebRuntime": false,
+  "npmClient": "npm",
+  "webDir": "out",
+  "server": {
+    "url": "https://paper-gain.vercel.app",
+    "cleartext": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "androidScaleType": "CENTER_INSIDE",
+      "androidSplashResourceName": "splash_screen"
+    }
+  },
+  "cordova": {}
+}

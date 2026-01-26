@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Paper Gain</string>
+    <string name="title_activity_main">Paper Gain</string>
+    <string name="package_name">com.papergain.app</string>
+    <string name="custom_url_scheme">com.papergain.app</string>
+</resources>
