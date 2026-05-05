@@ -3,6 +3,10 @@
   "appName": "Paper Gain",
   "webDir": "out",
   "bundledWebRuntime": false,
+  "server": {
+    "url": "https://paper-investing-dau7.vercel.app/",
+    "cleartext": false
+  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0
