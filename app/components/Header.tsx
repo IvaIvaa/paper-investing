@@ -36,34 +36,34 @@ export default function Header() {
   }, [])
 
   function handleAdvance() {
-    setDate(prev => {
-      const nextDate = new Date(prev)
-      nextDate.setDate(nextDate.getDate() + 7)
-      localStorage.setItem(DATE_KEY, nextDate.toISOString())
+    // ── Compute next date synchronously ──
+    const nextDate = new Date(date)
+    nextDate.setDate(nextDate.getDate() + 7)
+    localStorage.setItem(DATE_KEY, nextDate.toISOString())
 
-      const prevMonth = prev.getMonth()
-      const nextMonth = nextDate.getMonth()
+    const prevMonth = date.getMonth()
+    const nextMonth = nextDate.getMonth()
 
-      // 1. Apply last week's pending news prices (or random if first week)
-      advanceWeek()
+    // 1. Apply this week's prices (uses last preview's news effect)
+    advanceWeek()
 
-      // 2. Monthly events when month rolls over
-      if (prevMonth !== nextMonth) {
-        setEnergy(100)
-        if (currentJobId && JOB_EFFECTS[currentJobId]) {
-          const job = JOB_EFFECTS[currentJobId]
-          setEnergy(e => Math.max(0, e - job.energyCost))
-          addMoney(job.salary)
-          addXP(job.xpGain)
-        }
-        advanceMonth()
+    // 2. Monthly events
+    if (prevMonth !== nextMonth) {
+      setEnergy(100)
+      if (currentJobId && JOB_EFFECTS[currentJobId]) {
+        const job = JOB_EFFECTS[currentJobId]
+        setEnergy(e => Math.max(0, e - job.energyCost))
+        addMoney(job.salary)
+        addXP(job.xpGain)
       }
+      advanceMonth()
+    }
 
-      return nextDate
-    })
-
-    // 3. Generate NEXT week's news preview (prices not moved yet)
+    // 3. Preview NEXT week's news — runs after advanceWeek so weekStore is already incremented
     previewWeek()
+
+    // 4. Update date display
+    setDate(nextDate)
   }
 
   return (
