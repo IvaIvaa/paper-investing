@@ -476,7 +476,7 @@ function Placeholder() {
    PRICE CHART (SVG)
 ================================ */
 function PriceChart({ history, range }: { history: number[]; range: TimeRange }) {
-  const sliceMap: Record<TimeRange, number> = { '1W': 1, '1M': 4, '3M': 12, '1Y': 52, 'ALL': 999 }
+  const sliceMap: Record<TimeRange, number> = { '1W': 2, '1M': 4, '3M': 12, '1Y': 52, 'ALL': 999 }
   const data = history.slice(-sliceMap[range])
 
   if (data.length < 2) {

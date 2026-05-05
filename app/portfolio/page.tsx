@@ -5,6 +5,93 @@ import { usePlayer } from '@/lib/usePlayer'
 
 type PortfolioTab = 'stocks' | 'realestate'
 
+/* ===============================
+   STOCKS PORTFOLIO
+================================ */
+function StocksPortfolio() {
+  const { holdings, stocks, sellStock, balance } = usePlayer()
+
+  if (holdings.length === 0) {
+    return (
+      <div className="text-center text-gray-500 mt-10 space-y-2">
+        <p className="text-4xl">📈</p>
+        <p className="font-semibold text-gray-300">No stocks owned yet</p>
+        <p className="text-sm">Go to the Market tab to buy your first stock.</p>
+      </div>
+    )
+  }
+
+  const totalValue = holdings.reduce((sum, h) => {
+    const stock = stocks.find(s => s.ticker === h.ticker)
+    return sum + (stock ? stock.price * h.quantity : 0)
+  }, 0)
+
+  const totalCost = holdings.reduce((sum, h) => sum + h.totalCost, 0)
+  const totalPL   = totalValue - totalCost
+  const totalPct  = totalCost > 0 ? (totalPL / totalCost) * 100 : 0
+
+  return (
+    <>
+      {/* Summary card */}
+      <div className="bg-[#161b26] border border-[#1f2430] rounded-xl p-4 mb-6">
+        <div className="text-sm text-gray-400">Stock Portfolio Value</div>
+        <div className="text-2xl font-bold">€{totalValue.toLocaleString()}</div>
+        <div className={`text-sm font-semibold mt-1 ${totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          {totalPL >= 0 ? '▲' : '▼'} €{Math.abs(totalPL).toLocaleString()} ({totalPct.toFixed(2)}%)
+        </div>
+      </div>
+
+      {/* Holdings list */}
+      <div className="space-y-3">
+        {holdings.map(h => {
+          const stock   = stocks.find(s => s.ticker === h.ticker)
+          const price   = stock?.price ?? 0
+          const value   = price * h.quantity
+          const avgPrice = h.totalCost / h.quantity
+          const pl      = value - h.totalCost
+          const pct     = h.totalCost > 0 ? (pl / h.totalCost) * 100 : 0
+
+          return (
+            <div key={h.ticker} className="bg-[#161b26] border border-[#1f2430] rounded-xl p-4">
+              {/* Top row */}
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <div className="font-bold text-lg">{h.ticker}</div>
+                  <div className="text-xs text-gray-400">{h.quantity} shares · avg €{avgPrice.toFixed(2)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold">€{value.toLocaleString()}</div>
+                  <div className={`text-sm font-semibold ${pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {pl >= 0 ? '+' : ''}€{pl.toFixed(2)} ({pct.toFixed(2)}%)
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex justify-between text-xs text-gray-400 mb-3">
+                <span>Current price: €{price}</span>
+                <span>Cost basis: €{h.totalCost.toFixed(2)}</span>
+              </div>
+
+              {/* Sell button */}
+              <button
+                onClick={() => {
+                  if (confirm(`Sell all ${h.quantity} shares of ${h.ticker} for €${value.toLocaleString()}?`)) {
+                    sellStock(h.ticker, h.quantity)
+                  }
+                }}
+                className="w-full py-2 rounded-lg bg-red-600/20 text-red-400 font-semibold text-sm hover:bg-red-600/30 transition"
+              >
+                Sell All ({h.quantity} shares · €{value.toLocaleString()})
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 export default function PortfolioPage() {
   const [tab, setTab] = useState<PortfolioTab>('realestate')
 
@@ -28,7 +115,7 @@ export default function PortfolioPage() {
         />
       </div>
 
-      {tab === 'stocks' && <StocksPlaceholder />}
+      {tab === 'stocks' && <StocksPortfolio />}
       {tab === 'realestate' && <RealEstatePortfolio />}
     </div>
   )
@@ -156,16 +243,6 @@ function RealEstatePortfolio() {
 }
 
 
-/* ===============================
-   STOCK PLACEHOLDER
-================================ */
-function StocksPlaceholder() {
-  return (
-    <div className="text-gray-400 text-sm">
-      Stock portfolio coming soon.
-    </div>
-  )
-}
 
 /* ===============================
    SUMMARY CARD
