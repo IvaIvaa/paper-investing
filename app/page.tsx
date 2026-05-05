@@ -88,9 +88,9 @@ export default function NewsPage() {
       ) : (
         <>
           <div className="flex items-center gap-3 mb-6">
-        <p className="text-sm text-gray-500">Week {news[0]?.week} headlines</p>
+        <p className="text-sm text-gray-500">Week {news[0]?.week} preview</p>
         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
-          ⏳ Prices not applied yet — go trade, then hit Apply Week
+          ⏳ Prices apply next Advance
         </span>
       </div>
           <div className="space-y-4">

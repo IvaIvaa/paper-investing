@@ -361,26 +361,23 @@ function previewWeekStore() {
   notify()
 }
 
-// ── STEP 2: Apply prices after player has read news & traded ──
+// ── STEP 2: Apply prices (uses pending news effect if available) ──
 function advanceWeekStore() {
-  if (!pendingWeekStore) return
-
   const seed = getOrCreateSeed()
-  const { posTicker, negTicker, targetWeek } = pendingWeekStore
 
-  weekStore = targetWeek
+  weekStore += 1
   localStorage.setItem(WEEK_KEY, String(weekStore))
 
-  // Random movement for every stock
+  // Use news tickers if we have pending news, otherwise pure random
+  const posTicker = pendingWeekStore?.posTicker ?? null
+  const negTicker = pendingWeekStore?.negTicker ?? null
+
   stockStore = stockStore.map(s => {
     const r   = seededRandom(seed + weekStore * 13_337 + s.ticker.charCodeAt(0))
-    const pct = (r - 0.5) * 0.06   // -3% to +3%
+    const pct = (r - 0.5) * 0.06
     let newPrice = Math.max(1, Math.round(s.price * (1 + pct)))
-
-    // Apply news effect on top
-    if (s.ticker === posTicker) newPrice = Math.max(1, Math.round(newPrice * 1.05))
-    if (s.ticker === negTicker) newPrice = Math.max(1, Math.round(newPrice * 0.95))
-
+    if (posTicker && s.ticker === posTicker) newPrice = Math.max(1, Math.round(newPrice * 1.05))
+    if (negTicker && s.ticker === negTicker) newPrice = Math.max(1, Math.round(newPrice * 0.95))
     return { ...s, lastPrice: s.price, price: newPrice }
   })
 
@@ -391,7 +388,7 @@ function advanceWeekStore() {
     if (priceHistoryStore[s.ticker].length > 52) priceHistoryStore[s.ticker].shift()
   })
 
-  // Clear pending — prices have been applied
+  // Clear pending
   pendingWeekStore = null
   localStorage.removeItem(PENDING_KEY)
   localStorage.setItem(STOCKS_KEY,  JSON.stringify(stockStore))
