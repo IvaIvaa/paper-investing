@@ -44,12 +44,19 @@ function StocksPortfolio() {
       {/* Holdings list */}
       <div className="space-y-3">
         {holdings.map(h => {
-          const stock   = stocks.find(s => s.ticker === h.ticker)
-          const price   = stock?.price ?? 0
-          const value   = price * h.quantity
+          const stock    = stocks.find(s => s.ticker === h.ticker)
+          const price    = stock?.price ?? 0
+          const lastPrice = stock?.lastPrice ?? price
+          const value    = price * h.quantity
           const avgPrice = h.totalCost / h.quantity
-          const pl      = value - h.totalCost
-          const pct     = h.totalCost > 0 ? (pl / h.totalCost) * 100 : 0
+
+          // P/L vs cost basis (all-time since bought)
+          const allTimePL  = value - h.totalCost
+          const allTimePct = h.totalCost > 0 ? (allTimePL / h.totalCost) * 100 : 0
+
+          // Weekly change (this week's price move)
+          const weeklyPL  = lastPrice > 0 ? ((price - lastPrice) / lastPrice) * 100 : 0
+          const weeklyAbs = (price - lastPrice) * h.quantity
 
           return (
             <div key={h.ticker} className="bg-[#161b26] border border-[#1f2430] rounded-xl p-4">
@@ -61,16 +68,35 @@ function StocksPortfolio() {
                 </div>
                 <div className="text-right">
                   <div className="font-semibold">€{value.toLocaleString()}</div>
-                  <div className={`text-sm font-semibold ${pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {pl >= 0 ? '+' : ''}€{pl.toFixed(2)} ({pct.toFixed(2)}%)
+                  <div className="text-xs text-gray-400">Current: €{price}</div>
+                </div>
+              </div>
+
+              {/* Weekly + All-time change row */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-[#0f1115] rounded-lg p-2">
+                  <div className="text-xs text-gray-500 mb-0.5">This week</div>
+                  <div className={`text-sm font-semibold ${weeklyPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {weeklyPL >= 0 ? '+' : ''}{weeklyPL.toFixed(2)}%
+                  </div>
+                  <div className={`text-xs ${weeklyAbs >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {weeklyAbs >= 0 ? '+' : ''}€{weeklyAbs.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-[#0f1115] rounded-lg p-2">
+                  <div className="text-xs text-gray-500 mb-0.5">All time</div>
+                  <div className={`text-sm font-semibold ${allTimePL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {allTimePL >= 0 ? '+' : ''}{allTimePct.toFixed(2)}%
+                  </div>
+                  <div className={`text-xs ${allTimePL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {allTimePL >= 0 ? '+' : ''}€{allTimePL.toFixed(2)}
                   </div>
                 </div>
               </div>
 
-              {/* Stats row */}
-              <div className="flex justify-between text-xs text-gray-400 mb-3">
-                <span>Current price: €{price}</span>
-                <span>Cost basis: €{h.totalCost.toFixed(2)}</span>
+              {/* Cost basis */}
+              <div className="text-xs text-gray-500 mb-3">
+                Cost basis: €{h.totalCost.toFixed(2)}
               </div>
 
               {/* Sell button */}
