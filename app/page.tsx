@@ -1,146 +1,20 @@
 'use client'
 
 import { usePlayer } from '@/lib/usePlayer'
-
-
-import {
-  getStocks,
-  tickMarket,
-  searchStocks as mockSearchStocks,
-} from '@/lib/market/mockMarket'
-
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import PlayerSetup from './player-setup'
 import type { Player } from './types/player'
-import { useRouter, usePathname } from 'next/navigation'
 
-const STARTING_BALANCE = 25_000n
-
-type Trade = {
-  id: number
-  symbol: string
-  quantity: number
-  price: number
-  type: 'BUY' | 'SELL'
-}
-
-const REFRESH_SECONDS = 30
-
-function StatCard({
-  title,
-  value,
-  sub,
-  color,
-}: {
-  title: string
-  value: string
-  sub?: string
-  color?: 'green' | 'red'
-}) {
-  return (
-    <div className="bg-[#161b26] p-6 rounded-2xl shadow-md shadow-black/20 border border-[#1f2430]">
-      <p className="text-sm font-medium text-gray-400">{title}</p>
-
-      <p
-        className={`mt-1 text-3xl font-semibold tabular-nums ${
-          color === 'green'
-            ? 'text-green-400'
-            : color === 'red'
-            ? 'text-red-400'
-            : 'text-gray-100'
-        }`}
-      >
-        {value}
-      </p>
-
-      {sub && <p className="mt-1 text-sm text-gray-500">{sub}</p>}
-    </div>
+export default function NewsPage() {
+  const { news, stocks, balance, week } = usePlayer() as any
+  const [privacyAccepted, setPrivacyAccepted] = useState(
+    typeof window !== 'undefined' && localStorage.getItem('privacyAccepted') === 'true'
   )
-}
-
-function formatMoney(value: bigint) {
-  const abs = value < 0n ? -value : value
-
-  if (abs >= 1_000_000_000_000n) {
-    return `${Number(value / 1_000_000_000n) / 1000}B+`
-  }
-
-  if (abs >= 100_000_000n) {
-    return `${Number(value / 1_000_000n) / 1000}M+`
-  }
-
-  return value
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-}
-
-export default function DashboardPage() {
-  const { advanceMonth, advanceWeek } = usePlayer()
-
-  const [sellError, setSellError] = useState<Record<number, string>>({})
-  const [privacyAccepted, setPrivacyAccepted] = useState(false)
-
-  const [symbol, setSymbol] = useState('')
-  const [buyQty, setBuyQty] = useState<number | ''>('')
-  const [inputPrice, setInputPrice] = useState<number | null>(null)
-  const [prevInputPrice, setPrevInputPrice] = useState<number | null>(null)
-  const [prevPrices, setPrevPrices] = useState<Record<string, number>>({})
-  const [symbolInput, setSymbolInput] = useState('')
-
-  const [balance, setBalance] = useState<bigint>(STARTING_BALANCE)
-  const [trades, setTrades] = useState<Trade[]>([])
-  const [livePrices, setLivePrices] = useState<Record<string, number>>({})
-  const [sellQty, setSellQty] = useState<Record<number, number>>({})
-
-  const [secondsLeft, setSecondsLeft] = useState(REFRESH_SECONDS)
-  const [loaded, setLoaded] = useState(false)
-  const [week, setWeek] = useState(1)
-
-  const [player, setPlayer] = useState<{
-    name: string
-    sex: 'male' | 'female' | 'other'
-  } | null>(null)
-
-  const router = useRouter()
-  const pathname = usePathname()
-
-  const [suggestions, setSuggestions] = useState<
-    { symbol: string; name: string }[]
-  >([])
-
-  useEffect(() => {
-    const storedPlayer = localStorage.getItem('playerProfile')
-    if (storedPlayer) setPlayer(JSON.parse(storedPlayer))
-
-    const privacy = localStorage.getItem('privacyAccepted')
-    if (privacy === 'true') setPrivacyAccepted(true)
-
-    setLoaded(true)
-    setBalance(STARTING_BALANCE)
-    setSecondsLeft(2)
-
-    const marketInterval = setInterval(() => {
-      tickMarket()
-      const prices: Record<string, number> = {}
-      getStocks().forEach(stock => {
-        prices[stock.symbol] = stock.price
-      })
-      setPrevPrices(livePrices)
-      setLivePrices(prices)
-      setSecondsLeft(2)
-    }, 2000)
-
-    const countdownInterval = setInterval(() => {
-      setSecondsLeft(s => (s > 1 ? s - 1 : 1))
-    }, 1000)
-
-    return () => {
-      clearInterval(marketInterval)
-      clearInterval(countdownInterval)
-    }
-  }, [])
-
-  if (!loaded) return null
+  const [player, setPlayer] = useState<Player | null>(() => {
+    if (typeof window === 'undefined') return null
+    const s = localStorage.getItem('playerProfile')
+    return s ? JSON.parse(s) : null
+  })
 
   if (!privacyAccepted) {
     return (
@@ -149,11 +23,9 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold mb-4 text-gray-100">
             Privacy Policy & Disclaimer
           </h2>
-
           <p className="mb-3 text-sm text-gray-400">
-            Paper Gain is an educational investing simulation game.
+            Paper Gain is an educational investing simulation game. All prices and events are fictional. No real money is involved.
           </p>
-
           <button
             onClick={() => {
               localStorage.setItem('privacyAccepted', 'true')
@@ -172,35 +44,94 @@ export default function DashboardPage() {
     return (
       <PlayerSetup
         onComplete={(newPlayer: Player) => {
-          localStorage.setItem(
-            'playerProfile',
-            JSON.stringify(newPlayer)
-          )
+          localStorage.setItem('playerProfile', JSON.stringify(newPlayer))
           setPlayer(newPlayer)
-          setBalance(STARTING_BALANCE)
         }}
       />
     )
   }
 
+  const sentimentConfig = {
+    positive: {
+      border:  'border-green-500/40',
+      bg:      'bg-green-500/5',
+      badge:   'bg-green-500/20 text-green-400',
+      label:   '📈 Positive',
+      ticker:  'text-green-400',
+    },
+    negative: {
+      border:  'border-red-500/40',
+      bg:      'bg-red-500/5',
+      badge:   'bg-red-500/20 text-red-400',
+      label:   '📉 Negative',
+      ticker:  'text-red-400',
+    },
+    neutral: {
+      border:  'border-[#1f2430]',
+      bg:      '',
+      badge:   'bg-gray-700/40 text-gray-400',
+      label:   '➖ Neutral',
+      ticker:  'text-gray-400',
+    },
+  }
+
   return (
-     <div className="min-h-screen bg-[#0f1115] text-gray-100 px-4 pt-6 pb-24">
+    <div className="bg-[#0f1115] text-gray-100 px-4 pt-6 pb-40 min-h-screen">
+      <h1 className="text-2xl font-bold text-blue-400 mb-1">Market News</h1>
 
-      {/* 📄 MAIN CONTENT */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24">
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-[#3b82f6] mb-3">
-            Market News
-          </h2>
-
-          <div className="bg-[#161b26] rounded-xl p-4 border border-[#1f2430]">
-            <p className="font-semibold">Week {week} Overview</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Markets are calm today.
-            </p>
-          </div>
+      {news.length === 0 ? (
+        <div className="mt-10 text-center text-gray-500 space-y-2">
+          <p className="text-4xl">📰</p>
+          <p className="font-semibold text-gray-300">No news yet</p>
+          <p className="text-sm">Press <span className="text-blue-400 font-semibold">Advance</span> to generate this week's headlines.</p>
         </div>
-      </main>
+      ) : (
+        <>
+          <p className="text-sm text-gray-500 mb-6">Week {news[0]?.week} headlines</p>
+          <div className="space-y-4">
+            {news.map((item: any, i: number) => {
+              const cfg = sentimentConfig[item.sentiment as keyof typeof sentimentConfig]
+              return (
+                <div
+                  key={i}
+                  className={`rounded-2xl border p-4 space-y-2 ${cfg.border} ${cfg.bg} bg-[#161b26]`}
+                >
+                  {/* Badge + ticker */}
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                      {cfg.label}
+                    </span>
+                    {item.ticker !== 'MARKET' && (
+                      <span className={`text-xs font-bold ${cfg.ticker}`}>
+                        {item.ticker}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Headline */}
+                  <p className="font-semibold text-gray-100 leading-snug">
+                    {item.headline}
+                  </p>
+
+                  {/* Body */}
+                  <p className="text-sm text-gray-400 leading-relaxed">
+                    {item.body}
+                  </p>
+
+                  {/* Price impact hint */}
+                  {item.ticker !== 'MARKET' && (
+                    <p className={`text-xs font-medium ${cfg.ticker}`}>
+                      {item.sentiment === 'positive'
+                        ? `▲ ${item.ticker} received an extra +5% boost this week`
+                        : `▼ ${item.ticker} took an extra -5% hit this week`}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }

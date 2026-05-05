@@ -473,7 +473,55 @@ function Placeholder() {
 }
 
 /* ===============================
-   STOCK MODAL (UNCHANGED)
+   PRICE CHART (SVG)
+================================ */
+function PriceChart({ history, range }: { history: number[]; range: TimeRange }) {
+  const sliceMap: Record<TimeRange, number> = { '1W': 1, '1M': 4, '3M': 12, '1Y': 52, 'ALL': 999 }
+  const data = history.slice(-sliceMap[range])
+
+  if (data.length < 2) {
+    return (
+      <div className="h-40 bg-[#161b26] border border-[#1f2430] rounded-xl mb-4 flex flex-col items-center justify-center text-gray-500 text-sm gap-1">
+        <span>📊</span>
+        <span>Keep advancing to see the chart</span>
+      </div>
+    )
+  }
+
+  const min    = Math.min(...data)
+  const max    = Math.max(...data)
+  const range_ = max - min || 1
+  const W = 300, H = 100
+  const isUp = data[data.length - 1] >= data[0]
+  const color = isUp ? '#10b981' : '#ef4444'
+
+  const pts = data.map((p, i) => {
+    const x = (i / (data.length - 1)) * W
+    const y = H - ((p - min) / range_) * (H - 4) - 2
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  // filled area
+  const fillPts = `0,${H} ` + pts + ` ${W},${H}`
+
+  return (
+    <div className="h-40 bg-[#161b26] border border-[#1f2430] rounded-xl mb-4 overflow-hidden">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`grad-${isUp}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <polygon points={fillPts} fill={`url(#grad-${isUp})`} />
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
+
+/* ===============================
+   STOCK MODAL (with buy/sell + chart)
 ================================ */
 function StockModal({
   stock,
@@ -483,39 +531,54 @@ function StockModal({
   onClose: () => void
 }) {
   const [range, setRange] = useState<TimeRange>('1M')
+  const [qty, setQty]     = useState<number | ''>('')
+  const [msg, setMsg]     = useState('')
+  const [tab, setTab]     = useState<'buy' | 'sell'>('buy')
+
+  const { buyStock, sellStock, balance, holdings, priceHistory } = usePlayer()
+
+  const holding  = holdings.find(h => h.ticker === stock.ticker)
+  const owned    = holding?.quantity ?? 0
+  const avgPrice = holding ? holding.totalCost / holding.quantity : 0
+  const history  = priceHistory[stock.ticker] ?? []
+
+  function handleBuy() {
+    const q = Number(qty)
+    if (!q || q <= 0) { setMsg('Enter a valid quantity.'); return }
+    const cost = stock.price * q
+    if (cost > balance) { setMsg(`Not enough balance. Need €${cost.toLocaleString()}.`); return }
+    const ok = buyStock(stock.ticker, q)
+    if (ok) { setMsg(`✅ Bought ${q} × ${stock.ticker} for €${cost.toLocaleString()}`); setQty('') }
+    else     { setMsg('Purchase failed.') }
+  }
+
+  function handleSell() {
+    const q = Number(qty)
+    if (!q || q <= 0)  { setMsg('Enter a valid quantity.'); return }
+    if (q > owned)     { setMsg(`You only own ${owned} shares.`); return }
+    const ok = sellStock(stock.ticker, q)
+    if (ok) { setMsg(`✅ Sold ${q} × ${stock.ticker} for €${(stock.price * q).toLocaleString()}`); setQty('') }
+    else     { setMsg('Sale failed.') }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center px-4">
-      <div className="bg-[#0f1115] border border-[#1f2430] rounded-2xl w-full max-w-md p-5">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center px-4 pb-4">
+      <div className="bg-[#0f1115] border border-[#1f2430] rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
+
         {/* Header */}
         <div className="flex justify-between mb-3">
           <div>
-            <div className="text-xl font-bold">
-              {stock.ticker}
-            </div>
-            <div className="text-sm text-gray-400">
-              {stock.name}
-            </div>
+            <div className="text-xl font-bold">{stock.ticker}</div>
+            <div className="text-sm text-gray-400">{stock.name}</div>
           </div>
-          <button onClick={onClose} className="text-xl">
-            ✕
-          </button>
+          <button onClick={onClose} className="text-xl text-gray-400 hover:text-white">✕</button>
         </div>
 
         {/* Price */}
-        <div className="flex justify-between mb-4">
-          <div className="text-2xl font-bold">
-            €{stock.price}
-          </div>
-          <div
-            className={
-              stock.change >= 0
-                ? 'text-green-400'
-                : 'text-red-400'
-            }
-          >
-            {stock.change >= 0 ? '+' : ''}
-            {stock.change.toFixed(2)}%
+        <div className="flex justify-between items-end mb-4">
+          <div className="text-2xl font-bold">€{stock.price}</div>
+          <div className={stock.change >= 0 ? 'text-green-400' : 'text-red-400'}>
+            {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
           </div>
         </div>
 
@@ -525,54 +588,98 @@ function StockModal({
             <button
               key={r}
               onClick={() => setRange(r)}
-              className={`flex-1 py-1 rounded-md text-xs
-                ${
-                  range === r
-                    ? 'bg-green-600 text-white'
-                    : 'bg-[#161b26] text-gray-400'
-                }`}
+              className={`flex-1 py-1 rounded-md text-xs font-medium
+                ${range === r ? 'bg-green-600 text-white' : 'bg-[#161b26] text-gray-400'}`}
             >
               {r}
             </button>
           ))}
         </div>
 
-        {/* Chart placeholder */}
-        <div className="h-40 bg-[#161b26] border border-[#1f2430] rounded-xl mb-4 flex items-center justify-center text-gray-500">
-          Price chart ({range})
-        </div>
+        {/* ✅ Real chart */}
+        <PriceChart history={history} range={range} />
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-          <Stat label="Volatility" value={stock.volatility} />
-          <Stat label="Market Cap" value={stock.marketCap} />
-          <Stat label="52W High" value={`€${stock.high52w}`} />
-          <Stat label="52W Low" value={`€${stock.low52w}`} />
-          <Stat
-            label="Dividend Yield"
-            value={
-              stock.dividendYield
-                ? `${stock.dividendYield}%`
-                : '—'
-            }
-          />
-          <Stat label="Sector" value={stock.sector} />
-        </div>
+        {/* Holdings info */}
+        {owned > 0 && (
+          <div className="bg-[#161b26] border border-[#1f2430] rounded-xl p-3 text-sm mb-4 flex justify-between">
+            <span className="text-gray-400">You own</span>
+            <span className="font-semibold">{owned} shares · avg €{avgPrice.toFixed(2)}</span>
+          </div>
+        )}
 
-        {/* Description */}
-        <p className="text-sm text-gray-400 mb-4">
-          {stock.description}
-        </p>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button className="flex-1 py-3 rounded-xl bg-green-600/20 text-green-400 font-semibold">
+        {/* Buy / Sell tabs */}
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={() => { setTab('buy'); setMsg(''); setQty('') }}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition
+              ${tab === 'buy' ? 'bg-green-600 text-white' : 'bg-[#161b26] text-gray-400'}`}
+          >
             Buy
           </button>
-          <button className="flex-1 py-3 rounded-xl bg-red-600/20 text-red-400 font-semibold">
-            Sell
+          <button
+            onClick={() => { setTab('sell'); setMsg(''); setQty('') }}
+            disabled={owned === 0}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition
+              ${tab === 'sell' && owned > 0 ? 'bg-red-600 text-white' : 'bg-[#161b26] text-gray-400 opacity-50'}`}
+          >
+            Sell {owned > 0 ? `(${owned})` : ''}
           </button>
         </div>
+
+        {/* Qty input */}
+        <div className="flex gap-2 mb-3">
+          <input
+            type="number"
+            min={1}
+            step={1}
+            placeholder="Quantity"
+            value={qty}
+            onChange={e => { setQty(parseInt(e.target.value) || ''); setMsg('') }}
+            className="flex-1 bg-[#161b26] border border-[#1f2430] rounded-xl px-4 py-3
+                       text-gray-100 placeholder-gray-500 focus:outline-none focus:border-green-500"
+          />
+          {qty !== '' && (
+            <div className="flex items-center text-sm text-gray-400 px-2">
+              = €{(stock.price * Number(qty)).toLocaleString()}
+            </div>
+          )}
+        </div>
+
+        {/* Action button */}
+        {tab === 'buy' ? (
+          <button
+            onClick={handleBuy}
+            disabled={!qty || Number(qty) <= 0 || stock.price * Number(qty) > balance}
+            className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold
+                       hover:bg-green-500 transition
+                       disabled:bg-green-900/30 disabled:text-green-700 disabled:cursor-not-allowed"
+          >
+            Buy {qty ? `${qty} × ${stock.ticker}` : stock.ticker}
+          </button>
+        ) : (
+          <button
+            onClick={handleSell}
+            disabled={!qty || Number(qty) <= 0 || Number(qty) > owned}
+            className="w-full py-3 rounded-xl bg-red-600 text-white font-semibold
+                       hover:bg-red-500 transition
+                       disabled:bg-red-900/30 disabled:text-red-700 disabled:cursor-not-allowed"
+          >
+            Sell {qty ? `${qty} × ${stock.ticker}` : stock.ticker}
+          </button>
+        )}
+
+        {/* Balance hint */}
+        <p className="text-xs text-gray-500 text-center mt-2">
+          Balance: €{balance.toLocaleString()}
+        </p>
+
+        {/* Message */}
+        {msg && (
+          <p className={`mt-3 text-sm font-medium text-center
+            ${msg.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>
+            {msg}
+          </p>
+        )}
       </div>
     </div>
   )
