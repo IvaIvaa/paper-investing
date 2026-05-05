@@ -16,6 +16,7 @@ const WEEK_KEY       = 'playerWeek'
 const NEWS_KEY       = 'playerNews'
 const HISTORY_KEY    = 'playerPriceHistory'
 const HOLDINGS_KEY   = 'playerHoldings'
+const PENDING_KEY    = 'playerPendingWeek'
 
 // ---------- TYPES ----------
 export type Skills = {
@@ -59,6 +60,13 @@ export type StockHolding = {
   ticker: string
   quantity: number
   totalCost: number   // sum of purchase prices for avg calc
+}
+
+// Pending week: news shown, prices not yet moved
+type PendingWeek = {
+  posTicker: string
+  negTicker: string
+  targetWeek: number
 }
 
 // ---------- NEWS TEMPLATES ----------
@@ -114,6 +122,7 @@ let weekStore = 0
 let newsStore: NewsItem[] = []
 let priceHistoryStore: Record<string, number[]> = {}
 let holdingsStore: StockHolding[] = []
+let pendingWeekStore: PendingWeek | null = null
 
 const listeners = new Set<() => void>()
 const notify = () => listeners.forEach(l => l())
@@ -302,78 +311,91 @@ function advanceMonthStore() {
   notify()
 }
 
-function advanceWeekStore() {
-  const seed = getOrCreateSeed()
+// ── STEP 1: Generate news preview (prices don't move yet) ──
+function previewWeekStore() {
+  const seed        = getOrCreateSeed()
+  const targetWeek  = weekStore + 1
+  const tickers     = stockStore.map(s => s.ticker)
 
-  weekStore += 1
-  localStorage.setItem(WEEK_KEY, String(weekStore))
-
-  // ── 1. Random price movement ──
-  stockStore = stockStore.map(s => {
-    const r = seededRandom(seed + weekStore * 13_337 + s.ticker.charCodeAt(0))
-    const pct = (r - 0.5) * 0.06   // -3% to +3%
-    return {
-      ...s,
-      lastPrice: s.price,
-      price: Math.max(1, Math.round(s.price * (1 + pct))),
-    }
-  })
-
-  // ── 2. Pick news tickers (different stocks) ──
-  const tickers = stockStore.map(s => s.ticker)
-  const posIdx = Math.floor(seededRandom(seed + weekStore * 444) * tickers.length)
-  let negIdx   = Math.floor(seededRandom(seed + weekStore * 555) * tickers.length)
+  // Pick two different tickers
+  const posIdx = Math.floor(seededRandom(seed + targetWeek * 444) * tickers.length)
+  let   negIdx = Math.floor(seededRandom(seed + targetWeek * 555) * tickers.length)
   if (negIdx === posIdx) negIdx = (negIdx + 1) % tickers.length
 
   const posTicker = tickers[posIdx]
   const negTicker = tickers[negIdx]
 
-  // ── 3. Apply news effect on top of random move ──
-  stockStore = stockStore.map(s => {
-    if (s.ticker === posTicker) return { ...s, price: Math.max(1, Math.round(s.price * 1.05)) }
-    if (s.ticker === negTicker) return { ...s, price: Math.max(1, Math.round(s.price * 0.95)) }
-    return s
-  })
-
-  // ── 4. Generate 3 news items ──
-  const pTpl = NEWS_POS[Math.floor(seededRandom(seed + weekStore * 111) * NEWS_POS.length)]
-  const nTpl = NEWS_NEG[Math.floor(seededRandom(seed + weekStore * 222) * NEWS_NEG.length)]
-  const uTpl = NEWS_NEU[Math.floor(seededRandom(seed + weekStore * 333) * NEWS_NEU.length)]
+  // Generate headlines
+  const pTpl = NEWS_POS[Math.floor(seededRandom(seed + targetWeek * 111) * NEWS_POS.length)]
+  const nTpl = NEWS_NEG[Math.floor(seededRandom(seed + targetWeek * 222) * NEWS_NEG.length)]
+  const uTpl = NEWS_NEU[Math.floor(seededRandom(seed + targetWeek * 333) * NEWS_NEU.length)]
 
   newsStore = [
     {
-      headline: pTpl.h.replace(/\{ticker\}/g, posTicker),
-      body:     pTpl.b.replace(/\{ticker\}/g, posTicker),
+      headline:  pTpl.h.replace(/\{ticker\}/g, posTicker),
+      body:      pTpl.b.replace(/\{ticker\}/g, posTicker),
       sentiment: 'positive',
-      ticker: posTicker,
-      week: weekStore,
+      ticker:    posTicker,
+      week:      targetWeek,
     },
     {
-      headline: nTpl.h.replace(/\{ticker\}/g, negTicker),
-      body:     nTpl.b.replace(/\{ticker\}/g, negTicker),
+      headline:  nTpl.h.replace(/\{ticker\}/g, negTicker),
+      body:      nTpl.b.replace(/\{ticker\}/g, negTicker),
       sentiment: 'negative',
-      ticker: negTicker,
-      week: weekStore,
+      ticker:    negTicker,
+      week:      targetWeek,
     },
     {
-      headline: uTpl.h,
-      body:     uTpl.b,
+      headline:  uTpl.h,
+      body:      uTpl.b,
       sentiment: 'neutral',
-      ticker: 'MARKET',
-      week: weekStore,
+      ticker:    'MARKET',
+      week:      targetWeek,
     },
   ]
-  localStorage.setItem(NEWS_KEY, JSON.stringify(newsStore))
 
-  // ── 5. Record price history (max 52 weeks) ──
+  // Save news + pending state (prices NOT moved yet)
+  pendingWeekStore = { posTicker, negTicker, targetWeek }
+  localStorage.setItem(NEWS_KEY,   JSON.stringify(newsStore))
+  localStorage.setItem(PENDING_KEY, JSON.stringify(pendingWeekStore))
+  notify()
+}
+
+// ── STEP 2: Apply prices after player has read news & traded ──
+function advanceWeekStore() {
+  if (!pendingWeekStore) return
+
+  const seed = getOrCreateSeed()
+  const { posTicker, negTicker, targetWeek } = pendingWeekStore
+
+  weekStore = targetWeek
+  localStorage.setItem(WEEK_KEY, String(weekStore))
+
+  // Random movement for every stock
+  stockStore = stockStore.map(s => {
+    const r   = seededRandom(seed + weekStore * 13_337 + s.ticker.charCodeAt(0))
+    const pct = (r - 0.5) * 0.06   // -3% to +3%
+    let newPrice = Math.max(1, Math.round(s.price * (1 + pct)))
+
+    // Apply news effect on top
+    if (s.ticker === posTicker) newPrice = Math.max(1, Math.round(newPrice * 1.05))
+    if (s.ticker === negTicker) newPrice = Math.max(1, Math.round(newPrice * 0.95))
+
+    return { ...s, lastPrice: s.price, price: newPrice }
+  })
+
+  // Record price history (max 52 weeks)
   stockStore.forEach(s => {
     if (!priceHistoryStore[s.ticker]) priceHistoryStore[s.ticker] = []
     priceHistoryStore[s.ticker].push(s.price)
     if (priceHistoryStore[s.ticker].length > 52) priceHistoryStore[s.ticker].shift()
   })
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(priceHistoryStore))
-  localStorage.setItem(STOCKS_KEY,  JSON.stringify(stockStore))
 
+  // Clear pending — prices have been applied
+  pendingWeekStore = null
+  localStorage.removeItem(PENDING_KEY)
+  localStorage.setItem(STOCKS_KEY,  JSON.stringify(stockStore))
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(priceHistoryStore))
   notify()
 }
 
@@ -412,6 +434,7 @@ export function usePlayer() {
   const [news, setNews]                         = useState<NewsItem[]>([])
   const [priceHistory, setPriceHistory]         = useState<Record<string, number[]>>({})
   const [holdings, setHoldings]                 = useState<StockHolding[]>([])
+  const [pendingWeek, setPendingWeek]           = useState<PendingWeek | null>(null)
 
   useEffect(() => {
     // ── Load all state from localStorage ──
@@ -467,6 +490,12 @@ export function usePlayer() {
       holdingsStore = rawHoldings ? JSON.parse(rawHoldings) : []
     } catch { holdingsStore = [] }
 
+    // Pending week
+    try {
+      const rawPending = localStorage.getItem(PENDING_KEY)
+      pendingWeekStore = rawPending ? JSON.parse(rawPending) : null
+    } catch { pendingWeekStore = null }
+
     // ── Sync React state ──
     setEnergy(energyStore)
     setXP(xpStore)
@@ -479,6 +508,7 @@ export function usePlayer() {
     setNews([...newsStore])
     setPriceHistory({ ...priceHistoryStore })
     setHoldings([...holdingsStore])
+    setPendingWeek(pendingWeekStore ? { ...pendingWeekStore } : null)
 
     const listener = () => {
       setEnergy(energyStore)
@@ -492,6 +522,7 @@ export function usePlayer() {
       setNews([...newsStore])
       setPriceHistory({ ...priceHistoryStore })
       setHoldings([...holdingsStore])
+      setPendingWeek(pendingWeekStore ? { ...pendingWeekStore } : null)
     }
 
     listeners.add(listener)
@@ -511,6 +542,7 @@ export function usePlayer() {
     news,
     priceHistory,
     holdings,
+    pendingWeek,
     energy,
     xp,
     level: computeLevel(xp),
@@ -532,7 +564,8 @@ export function usePlayer() {
     upgradeSkill:   upgradeSkillStore,
     sellProperty:   sellPropertyStore,
     advanceMonth:   advanceMonthStore,
-    advanceWeek:    advanceWeekStore,
+    previewWeek:    previewWeekStore,    // Step 1: show news, don't move prices
+    advanceWeek:    advanceWeekStore,    // Step 2: apply prices after player trades
     buyStock:       buyStockStore,
     sellStock:      sellStockStore,
   }

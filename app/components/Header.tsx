@@ -3,20 +3,10 @@
 import { useEffect, useState } from 'react'
 import { usePlayer } from '@/lib/usePlayer'
 
-
-const DATE_KEY = 'gameDate'
+const DATE_KEY   = 'gameDate'
 const START_DATE = new Date('2026-01-01')
 
-
-// ⚠️ TEMP job effects (keep here for now)
-export const JOB_EFFECTS: Record<
-  string,
-  {
-    salary: number
-    energyCost: number
-    xpGain: number
-  }
-> = {
+export const JOB_EFFECTS: Record<string, { salary: number; energyCost: number; xpGain: number }> = {
   'job-1': { salary: 1800, energyCost: 10, xpGain: 20 },
   'job-2': { salary: 2400, energyCost: 12, xpGain: 25 },
   'job-3': { salary: 4200, energyCost: 18, xpGain: 35 },
@@ -25,68 +15,67 @@ export const JOB_EFFECTS: Record<
 }
 
 export default function Header() {
-  // ✅ SINGLE source of player state
   const {
-  energy,
-  setEnergy,
-  balance,
-  addMoney,
-  addXP,
-  currentJobId,
-  getMonthlyRent,
-  advanceWeek,
-  advanceMonth, // ✅ ADD THIS
-} = usePlayer()
-
-
+    energy,
+    setEnergy,
+    balance,
+    addMoney,
+    addXP,
+    currentJobId,
+    advanceWeek,
+    advanceMonth,
+    previewWeek,
+    pendingWeek,
+  } = usePlayer()
 
   const [date, setDate] = useState<Date>(START_DATE)
 
-  // load date once
   useEffect(() => {
     const stored = localStorage.getItem(DATE_KEY)
-    if (stored) {
-      setDate(new Date(stored))
-    } else {
-      localStorage.setItem(DATE_KEY, START_DATE.toISOString())
-    }
+    if (stored) setDate(new Date(stored))
+    else localStorage.setItem(DATE_KEY, START_DATE.toISOString())
   }, [])
 
-  const advanceWeekClick = () => {
-  setDate(prev => {
-    const nextDate = new Date(prev)
-    nextDate.setDate(nextDate.getDate() + 7)
+  function handleAdvance() {
+    if (!pendingWeek) {
+      // ── STEP 1: generate news, don't move prices yet ──
+      previewWeek()
+    } else {
+      // ── STEP 2: player has read news — apply prices & advance date ──
+      setDate(prev => {
+        const nextDate = new Date(prev)
+        nextDate.setDate(nextDate.getDate() + 7)
+        localStorage.setItem(DATE_KEY, nextDate.toISOString())
 
-    localStorage.setItem(DATE_KEY, nextDate.toISOString())
+        const prevMonth = prev.getMonth()
+        const nextMonth = nextDate.getMonth()
 
-    // ✅ STOCKS MOVE EVERY WEEK
-    advanceWeek()
+        // Apply stock price movement (uses pendingWeek data)
+        advanceWeek()
 
-    const prevMonth = prev.getMonth()
-    const nextMonth = nextDate.getMonth()
+        // Monthly events (salary, real estate, energy reset)
+        if (prevMonth !== nextMonth) {
+          setEnergy(100)
+          if (currentJobId && JOB_EFFECTS[currentJobId]) {
+            const job = JOB_EFFECTS[currentJobId]
+            setEnergy(e => Math.max(0, e - job.energyCost))
+            addMoney(job.salary)
+            addXP(job.xpGain)
+          }
+          advanceMonth()
+        }
 
-    // ✅ MONTHLY EVENTS
-    if (prevMonth !== nextMonth) {
-      setEnergy(100)
-
-      if (currentJobId && JOB_EFFECTS[currentJobId]) {
-        const job = JOB_EFFECTS[currentJobId]
-        setEnergy(e => Math.max(0, e - job.energyCost))
-        addMoney(job.salary)
-        addXP(job.xpGain)
-      }
-
-      // 🏠 real estate + rent + appreciation
-      advanceMonth()
+        return nextDate
+      })
     }
+  }
 
-    return nextDate
-  })
-}
-
-
-
-
+  // Button appearance changes based on state
+  const isPending  = !!pendingWeek
+  const btnLabel   = isPending ? '✅ Apply Week' : 'Advance'
+  const btnClass   = isPending
+    ? 'bg-green-600 hover:bg-green-500'
+    : 'bg-blue-600 hover:bg-blue-500'
 
   return (
     <header className="w-full px-6 py-4 flex justify-between items-start bg-[#141821] border-b border-[#1f2430]">
@@ -95,7 +84,6 @@ export default function Header() {
         <div className="text-2xl font-bold text-white">
           €{balance.toLocaleString()}
         </div>
-
         <div className="mt-1 text-sm text-gray-400">
           {energy} / 100 ⚡
         </div>
@@ -103,11 +91,19 @@ export default function Header() {
 
       {/* RIGHT */}
       <div className="flex flex-col items-end gap-2">
+
+        {/* Pending hint */}
+        {isPending && (
+          <p className="text-xs text-yellow-400 font-medium">
+            📰 News shown — trade now, then apply
+          </p>
+        )}
+
         <button
-          onClick={advanceWeekClick}
-          className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition"
+          onClick={handleAdvance}
+          className={`px-5 py-2 rounded-lg text-white font-semibold transition ${btnClass}`}
         >
-          Advance
+          {btnLabel}
         </button>
 
         <div className="text-sm text-gray-300">
