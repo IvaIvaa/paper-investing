@@ -59,9 +59,16 @@ let skillsStore: Skills = { ...EMPTY_SKILLS }
 let ownedPropertiesStore: OwnedProperty[] = []
 let monthStore = 0
 let stockStore: OwnedStock[] = [
-  { ticker: 'AI', price: 312, lastPrice: 312 },
-  { ticker: 'BNK', price: 120, lastPrice: 120 },
-  { ticker: 'NRG', price: 58, lastPrice: 58 },
+  { ticker: 'AI',   price: 312, lastPrice: 312 },
+  { ticker: 'BNK',  price: 120, lastPrice: 120 },
+  { ticker: 'NRG',  price: 58,  lastPrice: 58  },
+  { ticker: 'TECH', price: 245, lastPrice: 245 },
+  { ticker: 'MED',  price: 87,  lastPrice: 87  },
+  { ticker: 'AUTO', price: 134, lastPrice: 134 },
+  { ticker: 'RET',  price: 43,  lastPrice: 43  },
+  { ticker: 'FOOD', price: 71,  lastPrice: 71  },
+  { ticker: 'MIN',  price: 198, lastPrice: 198 },
+  { ticker: 'FIN',  price: 156, lastPrice: 156 },
 ]
 let weekStore = 0
 
@@ -359,12 +366,22 @@ ownedPropertiesStore = rawProps
   : []
 
   try {
-  const rawStocks = localStorage.getItem(STOCKS_KEY)
-  stockStore = rawStocks ? JSON.parse(rawStocks) : stockStore
-  setStocks([...stockStore])
-} catch {
-  // keep defaults
-}
+    const rawStocks = localStorage.getItem(STOCKS_KEY)
+    if (rawStocks) {
+      const saved: OwnedStock[] = JSON.parse(rawStocks)
+      // Merge: keep saved prices but add any new stocks not yet in localStorage
+      const savedTickers = new Set(saved.map(s => s.ticker))
+      const merged = [
+        ...saved,
+        ...stockStore.filter(s => !savedTickers.has(s.ticker)),
+      ]
+      stockStore = merged
+      localStorage.setItem(STOCKS_KEY, JSON.stringify(stockStore))
+    }
+    setStocks([...stockStore])
+  } catch {
+    // keep defaults
+  }
 
 
 

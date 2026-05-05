@@ -159,7 +159,7 @@ function StockCard({ stock, onClick }: { stock: Stock; onClick: (s: Stock) => vo
           <div className="font-semibold">€{stock.price}</div>
           <div className={stock.change >= 0 ? 'text-green-400' : 'text-red-400'}>
             {stock.change >= 0 ? '+' : ''}
-            {stock.change}%
+            {stock.change.toFixed(2)}%
           </div>
         </div>
       </div>
@@ -515,7 +515,7 @@ function StockModal({
             }
           >
             {stock.change >= 0 ? '+' : ''}
-            {stock.change}%
+            {stock.change.toFixed(2)}%
           </div>
         </div>
 

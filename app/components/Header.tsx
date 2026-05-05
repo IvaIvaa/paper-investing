@@ -104,10 +104,7 @@ export default function Header() {
       {/* RIGHT */}
       <div className="flex flex-col items-end gap-2">
         <button
-          onClick={() => {
-    advanceWeek()   // 📈 stocks move
-    advanceMonth()  // 🏠 real estate monthly logic
-  }}
+          onClick={advanceWeekClick}
           className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition"
         >
           Advance
