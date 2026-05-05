@@ -7,13 +7,15 @@ export async function POST(req: Request) {
     const { token } = await req.json()
 
     if (!token) {
-      return NextResponse.json([], { status: 200 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET!
-    ) as { userId: number }
+    let decoded: { userId: number }
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: number }
+    } catch {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
 
     const trades = await prisma.trade.findMany({
       where: { userId: decoded.userId },
@@ -23,6 +25,6 @@ export async function POST(req: Request) {
     return NextResponse.json(trades)
   } catch (err) {
     console.error('TRADES ROUTE ERROR:', err)
-    return NextResponse.json([], { status: 200 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

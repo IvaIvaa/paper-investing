@@ -1,72 +1,206 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { usePlayer } from '@/lib/usePlayer'
 
-export default function HomePage() {
-  const router = useRouter()
 
+import {
+  getStocks,
+  tickMarket,
+  searchStocks as mockSearchStocks,
+} from '@/lib/market/mockMarket'
+
+import { useEffect, useState } from 'react'
+import PlayerSetup from './player-setup'
+import type { Player } from './types/player'
+import { useRouter, usePathname } from 'next/navigation'
+
+const STARTING_BALANCE = 25_000n
+
+type Trade = {
+  id: number
+  symbol: string
+  quantity: number
+  price: number
+  type: 'BUY' | 'SELL'
+}
+
+const REFRESH_SECONDS = 30
+
+function StatCard({
+  title,
+  value,
+  sub,
+  color,
+}: {
+  title: string
+  value: string
+  sub?: string
+  color?: 'green' | 'red'
+}) {
   return (
-    <main className="min-h-screen flex items-center justify-center 
-                     bg-gradient-to-br from-[#0f0f0f] via-[#141414] to-black px-4">
+    <div className="bg-[#161b26] p-6 rounded-2xl shadow-md shadow-black/20 border border-[#1f2430]">
+      <p className="text-sm font-medium text-gray-400">{title}</p>
 
-      <div className="relative max-w-2xl w-full text-center">
+      <p
+        className={`mt-1 text-3xl font-semibold tabular-nums ${
+          color === 'green'
+            ? 'text-green-400'
+            : color === 'red'
+            ? 'text-red-400'
+            : 'text-gray-100'
+        }`}
+      >
+        {value}
+      </p>
 
-        {/* Glow */}
-        <div className="absolute -inset-1 bg-gradient-to-r from-green-500/20 to-blue-500/20 
-                        blur-3xl opacity-30 rounded-3xl" />
+      {sub && <p className="mt-1 text-sm text-gray-500">{sub}</p>}
+    </div>
+  )
+}
 
-        {/* Card */}
-        <div className="relative bg-white/95 backdrop-blur rounded-3xl shadow-2xl 
-                        p-12 space-y-8">
+function formatMoney(value: bigint) {
+  const abs = value < 0n ? -value : value
 
-          {/* Badge */}
-          <div className="inline-block px-4 py-1 rounded-full text-sm font-medium
-                          bg-gray-100 text-gray-700">
-            📈 Paper Gain • Real market data
-          </div>
+  if (abs >= 1_000_000_000_000n) {
+    return `${Number(value / 1_000_000_000n) / 1000}B+`
+  }
 
-          {/* Headline */}
-          <h1 className="text-5xl font-extrabold tracking-tight text-gray-900">
-            Learn the market.
-            <br />
-            <span className="text-transparent bg-clip-text 
-                             bg-gradient-to-r from-green-500 to-blue-600">
-              Risk nothing.
-            </span>
-          </h1>
+  if (abs >= 100_000_000n) {
+    return `${Number(value / 1_000_000n) / 1000}M+`
+  }
 
-          {/* Subtitle */}
-          <p className="text-lg text-gray-600 leading-relaxed">
-            Practice stock trading with <strong>real market prices</strong>,  
-            build strategies, and grow confidence — without using real money.
+  return value
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+export default function DashboardPage() {
+  const { advanceMonth, advanceWeek } = usePlayer()
+
+  const [sellError, setSellError] = useState<Record<number, string>>({})
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
+
+  const [symbol, setSymbol] = useState('')
+  const [buyQty, setBuyQty] = useState<number | ''>('')
+  const [inputPrice, setInputPrice] = useState<number | null>(null)
+  const [prevInputPrice, setPrevInputPrice] = useState<number | null>(null)
+  const [prevPrices, setPrevPrices] = useState<Record<string, number>>({})
+  const [symbolInput, setSymbolInput] = useState('')
+
+  const [balance, setBalance] = useState<bigint>(STARTING_BALANCE)
+  const [trades, setTrades] = useState<Trade[]>([])
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({})
+  const [sellQty, setSellQty] = useState<Record<number, number>>({})
+
+  const [secondsLeft, setSecondsLeft] = useState(REFRESH_SECONDS)
+  const [loaded, setLoaded] = useState(false)
+  const [week, setWeek] = useState(1)
+
+  const [player, setPlayer] = useState<{
+    name: string
+    sex: 'male' | 'female' | 'other'
+  } | null>(null)
+
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const [suggestions, setSuggestions] = useState<
+    { symbol: string; name: string }[]
+  >([])
+
+  useEffect(() => {
+    const storedPlayer = localStorage.getItem('playerProfile')
+    if (storedPlayer) setPlayer(JSON.parse(storedPlayer))
+
+    const privacy = localStorage.getItem('privacyAccepted')
+    if (privacy === 'true') setPrivacyAccepted(true)
+
+    setLoaded(true)
+    setBalance(STARTING_BALANCE)
+    setSecondsLeft(2)
+
+    const marketInterval = setInterval(() => {
+      tickMarket()
+      const prices: Record<string, number> = {}
+      getStocks().forEach(stock => {
+        prices[stock.symbol] = stock.price
+      })
+      setPrevPrices(livePrices)
+      setLivePrices(prices)
+      setSecondsLeft(2)
+    }, 2000)
+
+    const countdownInterval = setInterval(() => {
+      setSecondsLeft(s => (s > 1 ? s - 1 : 1))
+    }, 1000)
+
+    return () => {
+      clearInterval(marketInterval)
+      clearInterval(countdownInterval)
+    }
+  }, [])
+
+  if (!loaded) return null
+
+  if (!privacyAccepted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+        <div className="w-full max-w-md rounded-2xl bg-[#161b26] border border-[#1f2430] shadow-2xl p-6 text-gray-300 max-h-[85vh] overflow-y-auto">
+          <h2 className="text-xl font-bold mb-4 text-gray-100">
+            Privacy Policy & Disclaimer
+          </h2>
+
+          <p className="mb-3 text-sm text-gray-400">
+            Paper Gain is an educational investing simulation game.
           </p>
 
-          {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <button
-              onClick={() => router.push('/register')}
-              className="px-8 py-4 rounded-xl bg-black text-white text-lg font-semibold
-                         hover:bg-gray-900 active:scale-95 transition"
-            >
-              Get Started Free
-            </button>
-
-            <button
-              onClick={() => router.push('/login')}
-              className="px-8 py-4 rounded-xl text-lg font-semibold
-                         border border-gray-300 text-gray-700
-                         hover:bg-gray-100 active:scale-95 transition"
-            >
-              Log In
-            </button>
-          </div>
-
-          {/* Footer note */}
-          <p className="text-sm text-gray-400">
-            No credit card • Built with real-time data
-          </p>
+          <button
+            onClick={() => {
+              localStorage.setItem('privacyAccepted', 'true')
+              setPrivacyAccepted(true)
+            }}
+            className="w-full rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 py-3 text-white font-semibold"
+          >
+            I Understand & Agree
+          </button>
         </div>
       </div>
-    </main>
+    )
+  }
+
+  if (!player) {
+    return (
+      <PlayerSetup
+        onComplete={(newPlayer: Player) => {
+          localStorage.setItem(
+            'playerProfile',
+            JSON.stringify(newPlayer)
+          )
+          setPlayer(newPlayer)
+          setBalance(STARTING_BALANCE)
+        }}
+      />
+    )
+  }
+
+  return (
+     <div className="min-h-screen bg-[#0f1115] text-gray-100 px-4 pt-6 pb-24">
+
+      {/* 📄 MAIN CONTENT */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24">
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-[#3b82f6] mb-3">
+            Market News
+          </h2>
+
+          <div className="bg-[#161b26] rounded-xl p-4 border border-[#1f2430]">
+            <p className="font-semibold">Week {week} Overview</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Markets are calm today.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
   )
 }

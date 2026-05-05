@@ -23,6 +23,14 @@ export async function POST(req: Request) {
       )
     }
 
+    // ✅ Server-side password validation
+    if (typeof password !== 'string' || password.length < 8) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters.' },
+        { status: 400 }
+      )
+    }
+
     // 🔍 Check if user already exists
     const existing = await prisma.user.findUnique({
       where: { email }
